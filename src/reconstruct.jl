@@ -48,6 +48,7 @@ singleton_detection_lookup = Dict(
 
 """
 Finds the true index of a singleton, or the best-approximation singleton of a multiton.
+
 Arguments
 ---------
 U_slice: P-element Array{Float64,1}
@@ -60,4 +61,64 @@ Index of the corresponding right node.
 """
 function singleton_detection(U_slice, method=:mle; kwargs...)
     return singleton_detection_lookup.get(method)(U_slice; kwargs)
+end
+
+"""
+Computes delayed WHT observations and declares cardinality based on that.
+2 is a stand-in for any cardinality > 1. For debugging purposes.
+
+Arguments
+---------
+signal : InputSignal
+The input signal object.
+
+M : n×b Array{Bool,2}
+The subsampling matrix; takes on binary values.
+
+D : num_delays×n Array{Int64,2}
+The delays matrix.
+
+Returns
+-------
+(these are still as they are in Python - need to check dims first)
+cardinality : numpy.ndarray
+0 or 1 if the bin is a zeroton or singleton resp.; 2 if multiton.
+
+singleton_indices : list
+A list (in decimal form for compactness) of the k values of the singletons. 
+Length matches the number of 1s in cardinality.
+"""
+function bin_cardinality(signal::InputSignal, M, D)
+    b = size(M, 2)
+    U = compute_delayed_wht(signal, M, D)
+    cardinality = ones(Int64, [signal.n]) # vector of indicators
+    singleton_indices = []
+    cutoff = 2 * signal.noise_sd^2 * (2^(signal.n - b)) * size(D, 1)
+    if signal.noise_sd > 0
+        K = binary_ints(signal.n)
+        S = (-1).^ (D ⋅ K)
+    end
+    for (i, col) in enumerate(U')
+        sgn = 1
+        println("Column:   ", col)
+        if col ⋅ col <= cutoff
+            cardinality[i] = 0
+        else 
+            if signal.noise_sd == 0
+                k = singleton_detection_noiseless(col)
+            else
+                selection = @pipe bin_to_dec.(M' ⋅ K)' |> findall(==(i), _)
+                k, sgn = singleton_detection(col, method=:mle, selection=selection, S_slice=S[:, selection], n=signal.n)
+            end
+            rho = col |> abs |> mean
+            residual = col - sgn * rho * (-1).^ (D ⋅ K)
+            println("Residual: ", residual)
+            if residual ⋅ residual > cutoff 
+                cardinality[i] = 2
+            else
+                append!(singleton_indices, bin_to_dec(k))
+            end
+        end
+    end
+    return cardinality, singleton_indices
 end
