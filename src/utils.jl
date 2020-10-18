@@ -1,4 +1,5 @@
 using LinearAlgebra
+using Pipe
 
 function fwht(x::Array{Float64,1})
     N = length(x)
@@ -34,7 +35,7 @@ function binary_ints(m::Int64)
     return hcat(map(x->dec_to_bin(x, m), 0:2^m-1)...)'
 end
 
-function sign(x::Int64)
+function sign_spright(x::Int64)
     """
     Sign function that matches the convention (footnote 2 on page 11):
     returns 0 for positive reals and 1 for negative reals.
