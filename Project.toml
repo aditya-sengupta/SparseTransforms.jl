@@ -1,5 +1,16 @@
 name = "SPRIGHT"
-uuid = 
+uuid = "3695a3c4-6718-48f1-a527-58d476e53586"
+authors = ["Aditya Sengupta <aditya.sengupta@berkeley.edu>", "Ben Hoberman <bhoberman@berkeley.edu>", "Catherine Huang <thecatherinehuang@berkeley.edu>", "Tynan Sigg <tsigg@berkeley.edu>", "Orhan Ocal", "Amirali Aghazadeh"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
