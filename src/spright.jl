@@ -10,8 +10,13 @@ module SPRIGHT
     export transform, method_test, method_report
     using ProgressMeter
     include("utils.jl")
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
+    include("input_signal.jl")
+    export InputSignal
     include("query.jl")
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
     include("reconstruct.jl")
+    export singleton_detection, bin_cardinality
     
     """
     Full SPRIGHT encoding and decoding. Implements Algorithms 1 and 2 from [2].

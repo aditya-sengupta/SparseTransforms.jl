@@ -15,7 +15,7 @@ A semi-arbitrary fixed choice of the sparsity coefficient.
 See get_b for full signature.
 """
 function get_b_simple(signal::InputSignal)
-    return signal.n / 2
+    return signal.n ÷ 2
 end
 
 get_b_lookup = Dict(
@@ -39,22 +39,23 @@ b : Int64
 The sparsity coefficient.
 """
 function get_b(signal::InputSignal, method=:simple)
-    return get_b_lookup.get(method)(signal)
+    return get_b_lookup[method](signal)
 end
 
 """
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
-function get_Ms_simple(n::Int64, b::Int64, num_to_get::Int64 = nothing)
-    @assert n % b == 0, "b must be exactly divisible by n"
-    if isnothing(num_to_get)
-        num_to_get = n / b
-    end
+function get_Ms_simple(n::Int64, b::Int64)
+    
+    @assert n % b == 0 "b must be exactly divisible by n"
+    num_to_get = n ÷ b
 
     Ms = Any[]
-    for i in num_to_get-1:-1:-1
-        M = zeros(n, b)
-        M[(b * i):(b * (i + 1)), :] = I
+    for i in num_to_get-1:-1:0
+        M = zeros(Bool, n, b)
+        for j in 1:b
+            M[b*i+j, j] = 1
+        end
         push!(Ms, M)
     end
     return Ms
@@ -64,8 +65,8 @@ get_Ms_lookup = Dict(
     :simple => get_Ms_simple
 )
 
-function get_Ms(signal::InputSignal, method=:simple)
-    return get_Ms_lookup.get(method)(signal)
+function get_Ms(n::Int64, b::Int64, method=:simple)
+    return get_Ms_lookup[method](n, b)
 end
 
 """
@@ -119,7 +120,7 @@ D : num_delays×n Array{Bool,2}
 The delays matrix; if num_delays is not specified in kwargs, see the relevant sub-function for a default.
 """
 function get_D(n::Int64, method=:standard; kwargs...)
-    return get_D_lookup.get(method)(n)
+    return get_D_lookup[method](n)
 end
 
 """
@@ -138,9 +139,9 @@ indices : B-element Array{Int64,1}
 The (decimal) subsample indices.
 """
 function subsample_indices(M, d)
-    L = binary_ints(size(M, 2))
-    inds_binary = mod(M⋅L + d, 2)
-    return bin_to_dec(inds_binary)
+    L = binary_ints(size(M, 2))'
+    inds_binary = @pipe M*L .+ d |> mod.(_, 2) |> Bool.(_)
+    return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_)
 end
 
 """

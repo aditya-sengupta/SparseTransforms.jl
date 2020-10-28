@@ -18,7 +18,7 @@ end
 """
 Takes in a binary array and returns the corresponding integer. 
 """
-function bin_to_dec(x::Array{Bool,1})
+function bin_to_dec(x::AbstractArray{Bool})
     return 2 .^(length(x)-1 : -1 : 0) ⋅ x
 end
 
@@ -50,5 +50,5 @@ end
 Flip every bit in a boolean array.
 """
 function flip(x::Array{Bool,1})
-    return map(y -> !y, x)
+    return .!x
 end
