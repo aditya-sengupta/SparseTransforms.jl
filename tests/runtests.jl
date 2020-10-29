@@ -10,15 +10,19 @@ for (l, s) in zip(signal.loc, signal.strengths)
     @test signal.signal_w[l + 1] == s
 end
 
-println("Testing query methods")
+println("Testing query methods...")
 b = get_b(signal)
 Ms = get_Ms(n, b)
 D = get_D(n)
 whts_and_inds = map(M -> compute_delayed_wht(signal, M, D), Ms)
 
-println("Testing reconstruction")
+println("Testing reconstruction...")
 bin_cardinalities = map(M -> bin_cardinality(signal, M, D), Ms)
 
-println("Combining everything")
+println("Testing full transform...")
+methods = [:simple, :identity_like, :noiseless]
+spright_wht = transform(signal, methods; verbose=true)
 
-
+println("Checking transform result...")
+@assert all(spright_wht .≈ signal.signal_w)
+println("Transform is correct!")

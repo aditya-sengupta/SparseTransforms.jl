@@ -60,13 +60,14 @@ module SPRIGHT
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::InputSignal, methods::Array{Symbol,1}, verbose::Bool=false, report::Bool=false)
+    function transform(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
         num_peeling = 0
-        result = []
-        wht = zeros(Float64, signal.n)
+        locs = []
+        strengths = []
+        wht = zeros(Float64, 2 ^ signal.n)
         b = get_b(signal, query_method)
         Ms = get_Ms(signal.n, b, query_method)
         peeling_max = 2^b
@@ -94,7 +95,8 @@ module SPRIGHT
                 println(D)
             end
             
-            U, used_i = compute_delayed_wht(signal, M, D)
+            U, used_i = compute_delayed_wht(signal, M, D) 
+            U = hcat(U...)
             push!(Us, U)
             push!(Ss, (-1) .^(D * K))
             if report
@@ -146,7 +148,7 @@ module SPRIGHT
             multitons = [] # list of (i, j) values indicating where multitons are.
             
             for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
-                col_gen = @pipe U |> hcat(_...) |> eachrow |> enumerate
+                col_gen = @pipe U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
@@ -158,17 +160,17 @@ module SPRIGHT
                             n=signal.n
                         ) # find the best fit singleton
                         k_dec = bin_to_dec(k)
-                        rho = (S[:,k_dec] ⋅ col) * sgn / length(col)                    
-                        residual = col - sgn * rho * S[:,k_dec] 
+                        ρ = (S[:,k_dec+1] ⋅ col) * sgn / length(col)  
+                        residual = col - sgn * ρ * S[:,k_dec+1] 
                         if verbose
                             println((i, j), residual ⋅ residual)
                         end
                         if residual ⋅ residual > cutoff
-                            append!(multitons, (i, j))
+                            push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, rho, sgn)
+                            singletons[[i, j]] = (k, ρ, sgn)
                             if verbose
-                                print("amplitude, ", rho)
+                                println("amplitude, ", ρ)
                             end
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
@@ -197,7 +199,8 @@ module SPRIGHT
             ball_values = Dict()
             ball_sgn = Dict()
             for (_, (k, rho, sgn)) in singletons
-                push!(balls_to_peel, bin_to_dec(k))
+                ball = bin_to_dec(k)
+                push!(balls_to_peel, ball)
                 ball_values[ball] = rho
                 ball_sgn[ball] = sgn
             end
@@ -211,31 +214,36 @@ module SPRIGHT
             for ball in balls_to_peel
                 num_peeling += 1
                 k = dec_to_bin(ball, signal.n)
-                potential_peels = [(l, bin_to_dec(M.T.dot(k))) for (l, M) in enumerate(Ms)]
 
-                append!(result, (k, ball_sgn[ball]*ball_values[ball]))
+                push!(locs, k)
+                push!(strengths, ball_sgn[ball]*ball_values[ball])
                 
-                for peel in potential_peels
-                    signature_in_stage = Ss[peel[0]][:,ball]
+                for (l, M) in enumerate(Ms)
+                    peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
+                    signature_in_stage = Ss[l][:,ball+1]
                     to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
-                    Us[peel[0]][:,peel[1]] -= to_subtract
+                    U = Us[l]
+                    println(U)
+                    println("before subtraction")
+                    U_slice = U[peel, :]
+                    Us[l][peel,:] = U_slice - to_subtract
                     if verbose
                         println("this is subtracted:")
                         println(to_subtract)
-                        println("Peeled ball ", bin_to_dec(k), " off bin ", peel)
+                        println("Peeled ball ", bin_to_dec(k), " off bin (", l, ", ", peel, ")")
                     end
                 end # for peel
             end # for ball
         end # while
             
         loc = Set()
-        for (k, value) in result # iterating over (i, j)s
+        for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if wht[idx] == 0
-                wht[idx] = value
+            if wht[idx+1] == 0
+                wht[idx+1] = value
             else
-                wht[idx] = (wht[idx] + value) / 2 
+                wht[idx+1] = (wht[idx+1] + value) / 2 
                 # average out noise; e.g. in the example in 3.2, U1[11] and U2[11] are the same singleton,
                 # so averaging them reduces the effect of noise.
             end
