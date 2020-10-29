@@ -88,7 +88,7 @@ singleton_indices : list
 A list (in decimal form for compactness) of the k values of the singletons. 
 Length matches the number of 1s in cardinality.
 """
-function bin_cardinality(signal::InputSignal, M, D)
+function bin_cardinality(signal::InputSignal, M, D; verbose=false)
     b = size(M, 2)
     U, inds = compute_delayed_wht(signal, M, D)
     cardinality = ones(Int64, signal.n) # vector of indicators
@@ -101,7 +101,9 @@ function bin_cardinality(signal::InputSignal, M, D)
     col_generator = @pipe U |> hcat(_...) |> eachrow |> enumerate
     for (i, col) in col_generator
         sgn = 1
-        println("Column:   ", col)
+        if verbose
+            println("Column:   ", col)
+        end
         if col ⋅ col <= cutoff
             cardinality[i] = 0
         else 
@@ -113,7 +115,9 @@ function bin_cardinality(signal::InputSignal, M, D)
             end
             rho = @pipe col |> abs.(_) |> mean
             residual = col - sgn * rho * (-1).^ (D * k)
-            println("Residual: ", residual)
+            if verbose
+                println("Residual: ", residual)
+            end
             if residual ⋅ residual > cutoff 
                 cardinality[i] = 2
             else

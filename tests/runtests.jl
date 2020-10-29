@@ -1,7 +1,7 @@
 using SPRIGHT
 using Test
 
-println("Testing input signal constructor")
+println("Testing input signal constructor...")
 n, b = 4, 2
 signal = InputSignal(4, [4, 6, 10, 15])
 signal = InputSignal(4, [4, 6, 10, 15], Float64.([2, 4, 1, 1]))
@@ -24,5 +24,5 @@ methods = [:simple, :identity_like, :noiseless]
 spright_wht = transform(signal, methods; verbose=true)
 
 println("Checking transform result...")
-@assert all(spright_wht .≈ signal.signal_w)
+@test all(spright_wht .≈ signal.signal_w)
 println("Transform is correct!")

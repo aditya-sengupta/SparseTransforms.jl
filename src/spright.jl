@@ -89,12 +89,6 @@ module SPRIGHT
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
             D = get_D(signal.n, delays_method; num_delays=num_delays)
-            if verbose
-                println("-----")
-                println("a delay matrix")
-                println(D)
-            end
-            
             U, used_i = compute_delayed_wht(signal, M, D) 
             U = hcat(U...)
             push!(Us, U)
@@ -105,9 +99,6 @@ module SPRIGHT
         end
 
         cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
-        if verbose
-            println("cutoff = ", cutoff)
-        end
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
@@ -135,13 +126,6 @@ module SPRIGHT
         iters = 0
         max_iters = 2 ^ (b + 1)
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
-            if verbose
-                println("-----")
-                println("the measurement matrix")
-                for U in Us
-                    println(U)
-                end
-            end
             
             # first step: find all the singletons and multitons.
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
@@ -162,16 +146,10 @@ module SPRIGHT
                         k_dec = bin_to_dec(k)
                         ρ = (S[:,k_dec+1] ⋅ col) * sgn / length(col)  
                         residual = col - sgn * ρ * S[:,k_dec+1] 
-                        if verbose
-                            println((i, j), residual ⋅ residual)
-                        end
                         if residual ⋅ residual > cutoff
                             push!(multitons, [i, j])
                         else # declare as singleton
                             singletons[[i, j]] = (k, ρ, sgn)
-                            if verbose
-                                println("amplitude, ", ρ)
-                            end
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
@@ -179,7 +157,7 @@ module SPRIGHT
                             
             # all singletons and multitons are discovered
             if verbose
-                println("singletons:")
+                println("Singletons:")
                 for (ston_key, ston_value) in singletons
                     println(ston_key, bin_to_dec(ston_value[1]))
                 end
@@ -206,8 +184,8 @@ module SPRIGHT
             end
                 
             if verbose
-                println("these balls will be peeled")
-                print(balls_to_peel)
+                println("Balls to be peeled")
+                println(balls_to_peel)
             end
             # peel
             iters += 1
@@ -223,13 +201,9 @@ module SPRIGHT
                     signature_in_stage = Ss[l][:,ball+1]
                     to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
                     U = Us[l]
-                    println(U)
-                    println("before subtraction")
                     U_slice = U[peel, :]
                     Us[l][peel,:] = U_slice - to_subtract
                     if verbose
-                        println("this is subtracted:")
-                        println(to_subtract)
                         println("Peeled ball ", bin_to_dec(k), " off bin (", l, ", ", peel, ")")
                     end
                 end # for peel
