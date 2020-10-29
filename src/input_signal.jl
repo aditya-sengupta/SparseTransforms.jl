@@ -15,7 +15,7 @@ struct InputSignal
         noise = rand(Normal(0.0, noise_sd), N)
         wht = zeros(N)
         for (l, s) in zip(loc, strengths)
-            wht[l] = s
+            wht[l + 1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
         end
         signal_t = fwht(wht) + noise
         signal_w = fwht(signal_t) / N

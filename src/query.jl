@@ -141,7 +141,7 @@ The (decimal) subsample indices.
 function subsample_indices(M, d)
     L = binary_ints(size(M, 2))'
     inds_binary = @pipe M*L .+ d |> mod.(_, 2) |> Bool.(_)
-    return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_)
+    return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_) .+ 1
 end
 
 """
@@ -163,8 +163,10 @@ force_identity_like : Bool
 Whether to make D = [0; I] like in the noiseless case; for debugging.
 """
 function compute_delayed_wht(signal::InputSignal, M, D)
-    inds = map(d -> subsample_indices(M, d), D)
-    used_inds = Set(inds)
-    samples_to_transform = signal.signal_t[inds]
+    inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
+    used_inds = reduce(union, inds)
+    samples_to_transform = map(x -> signal.signal_t[x], inds)
+    print(samples_to_transform)
+    println("hi")
     return fwht.(samples_to_transform), used_inds
 end
