@@ -72,7 +72,7 @@ end
 """
 Gets the delays matrix [0; I], of dimension (n+1, n). See get_D for full signature.
 """
-function get_D_standard(n::Int64, kwargs...)
+function get_D_identity_like(n::Int64, kwargs...)
     return Bool.(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
 end
 
@@ -102,7 +102,7 @@ function get_D_nso(n::Int64; kwargs...)
 end
 
 get_D_lookup = Dict(
-    :standard => get_D_standard,
+    :identity_like => get_D_identity_like,
     :random => get_D_random
 )
 
@@ -119,7 +119,7 @@ Returns
 D : num_delays×n Array{Bool,2}
 The delays matrix; if num_delays is not specified in kwargs, see the relevant sub-function for a default.
 """
-function get_D(n::Int64, method=:standard; kwargs...)
+function get_D(n::Int64, method=:identity_like; kwargs...)
     return get_D_lookup[method](n)
 end
 
@@ -139,7 +139,7 @@ indices : B-element Array{Int64,1}
 The (decimal) subsample indices.
 """
 function subsample_indices(M, d)
-    L = binary_ints(size(M, 2))'
+    L = binary_ints(size(M, 2))
     inds_binary = @pipe M*L .+ d |> mod.(_, 2) |> Bool.(_)
     return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_) .+ 1
 end

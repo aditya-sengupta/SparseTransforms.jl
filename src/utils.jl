@@ -35,7 +35,7 @@ Returns a matrix where row 'i' is dec_to_bin(i, m),
 for i from 0 to 2 ** m - 1.
 """
 function binary_ints(m::Int64)
-    return @pipe 0:2^m-1 |> dec_to_bin.(_, m) |> hcat(_...)'
+    return @pipe 0:2^m-1 |> dec_to_bin.(_, m) |> hcat(_...)
 end
 
 """

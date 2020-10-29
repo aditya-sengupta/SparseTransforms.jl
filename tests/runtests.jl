@@ -14,5 +14,11 @@ println("Testing query methods")
 b = get_b(signal)
 Ms = get_Ms(n, b)
 D = get_D(n)
+whts_and_inds = map(M -> compute_delayed_wht(signal, M, D), Ms)
 
-sub_whts_1, used_inds = compute_delayed_wht(signal, Ms[1], D);
+println("Testing reconstruction")
+bin_cardinalities = map(M -> bin_cardinality(signal, M, D), Ms)
+
+println("Combining everything")
+
+

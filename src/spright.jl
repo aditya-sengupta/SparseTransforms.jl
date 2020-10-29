@@ -60,15 +60,15 @@ module SPRIGHT
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::InputSignal, methods::Array{Symbol,1}, verbose::Bool=false, report::Bool=False)
+    function transform(signal::InputSignal, methods::Array{Symbol,1}, verbose::Bool=false, report::Bool=false)
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
         num_peeling = 0
         result = []
-        wht = zeros(Float64, [signal.n])
-        b = get_b(signal, method=query_method)
-        Ms = get_Ms(signal.n, b, method=query_method)
+        wht = zeros(Float64, signal.n)
+        b = get_b(signal, query_method)
+        Ms = get_Ms(signal.n, b, query_method)
         peeling_max = 2^b
 
         Us, Ss = [], []
@@ -77,6 +77,7 @@ module SPRIGHT
         if report
             used = Set()
         end
+        
         if delays_method != :nso
             num_delays = signal.n + 1
         else
@@ -86,15 +87,16 @@ module SPRIGHT
 
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
-            D = get_D(signal.n, method=delays_method; num_delays=num_delays)
+            D = get_D(signal.n, delays_method; num_delays=num_delays)
             if verbose
                 println("-----")
                 println("a delay matrix")
                 println(D)
             end
+            
             U, used_i = compute_delayed_wht(signal, M, D)
-            append!(Us, U)
-            append!(Ss, (-1) .^(D ⋅ K))
+            push!(Us, U)
+            push!(Ss, (-1) .^(D * K))
             if report
                 used = union(used, used_i)
             end
@@ -106,9 +108,13 @@ module SPRIGHT
         end
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
-        select_froms = map(M -> bin_to_dec.(M' ⋅ K)', Ms)
+        select_froms = []
+        for M in Ms
+            selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
+            push!(select_froms, selects)
+        end
         # `select_froms` is the collection of 'j' values and associated indices
-        # so that we can quickly choose from the coefficient locations such that M.T @ k = j as in (20)
+        # so that we can quickly choose from the coefficient locations such that M.T * k = j as in (20)
         # example: ball j goes to bin at "select_froms[i][j]"" in stage i
         
         # begin peeling
@@ -123,7 +129,7 @@ module SPRIGHT
         # e.g. the singleton (0, 0), which in the example of section 3.2 is X[0100] + W1[00]
         # would be stored as the dictionary entry (0, 0): array([0, 1, 0, 0]).
         
-        multitons_found = True
+        multitons_found = true
         iters = 0
         max_iters = 2 ^ (b + 1)
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
@@ -140,12 +146,13 @@ module SPRIGHT
             multitons = [] # list of (i, j) values indicating where multitons are.
             
             for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
-                for (j, col) in enumerate(U.T)
+                col_gen = @pipe U |> hcat(_...) |> eachrow |> enumerate
+                for (j, col) in col_gen
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
                         k, sgn = singleton_detection(
                             col, 
-                            method=self.reconstruct_method; 
+                            reconstruct_method; 
                             selection=selection, 
                             S_slice=S[:, selection], 
                             n=signal.n
@@ -154,7 +161,7 @@ module SPRIGHT
                         rho = (S[:,k_dec] ⋅ col) * sgn / length(col)                    
                         residual = col - sgn * rho * S[:,k_dec] 
                         if verbose
-                            println((i, j), np.inner(residual, residual))
+                            println((i, j), residual ⋅ residual)
                         end
                         if residual ⋅ residual > cutoff
                             append!(multitons, (i, j))
