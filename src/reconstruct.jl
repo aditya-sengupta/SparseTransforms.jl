@@ -12,7 +12,7 @@ Noiseless-case singleton detection. Assumes P = n + 1 and D = [0; I].
 See singleton_detection for full signature.
 """
 function singleton_detection_noiseless(U_slice; kwargs...)
-    return -sign.(U_slice * U_slice[1])[2:length(U_slice)], true
+    return -sign.(U_slice * U_slice[1])[2:length(U_slice)] .== 1, 1
 end
 
 """
@@ -22,7 +22,7 @@ See singleton_detection for full signature.
 function singleton_detection_mle(U_slice; kwargs...)
     selection, S_slice, n = kwargs[:selection], kwargs[:S_slice], kwargs[:n]
     P = size(S_slice, 1)
-    alphas = (1 / P) * S_slice' ⋅ U_slice
+    alphas = (1 / P) * S_slice' * U_slice
     residuals = norm.(U_slice - (alphas * S_slice)') # this is sketch
     k_sel = argmin(residuals)
     return dec_to_bin(selection[k_sel], n), sign(alphas[k_sel])
@@ -60,7 +60,7 @@ k : n-element Array{Bool,1}
 Index of the corresponding right node.
 """
 function singleton_detection(U_slice, method=:mle; kwargs...)
-    return singleton_detection_lookup.get(method)(U_slice; kwargs)
+    return singleton_detection_lookup[method](U_slice; kwargs)
 end
 
 """
@@ -90,28 +90,29 @@ Length matches the number of 1s in cardinality.
 """
 function bin_cardinality(signal::InputSignal, M, D)
     b = size(M, 2)
-    U = compute_delayed_wht(signal, M, D)
-    cardinality = ones(Int64, [signal.n]) # vector of indicators
+    U, inds = compute_delayed_wht(signal, M, D)
+    cardinality = ones(Int64, signal.n) # vector of indicators
     singleton_indices = []
     cutoff = 2 * signal.noise_sd^2 * (2^(signal.n - b)) * size(D, 1)
     if signal.noise_sd > 0
         K = binary_ints(signal.n)
-        S = (-1).^ (D ⋅ K)
+        S = (-1).^ (D * K)
     end
-    for (i, col) in enumerate(U')
+    col_generator = @pipe U |> hcat(_...) |> eachrow |> enumerate
+    for (i, col) in col_generator
         sgn = 1
         println("Column:   ", col)
         if col ⋅ col <= cutoff
             cardinality[i] = 0
         else 
             if signal.noise_sd == 0
-                k = singleton_detection_noiseless(col)
+                k, sgn = singleton_detection_noiseless(col)
             else
-                selection = @pipe bin_to_dec.(M' ⋅ K)' |> findall(==(i), _)
+                selection = @pipe bin_to_dec.(M' * k)' |> findall(==(i), _)
                 k, sgn = singleton_detection(col, method=:mle, selection=selection, S_slice=S[:, selection], n=signal.n)
             end
-            rho = col |> abs |> mean
-            residual = col - sgn * rho * (-1).^ (D ⋅ K)
+            rho = @pipe col |> abs.(_) |> mean
+            residual = col - sgn * rho * (-1).^ (D * k)
             println("Residual: ", residual)
             if residual ⋅ residual > cutoff 
                 cardinality[i] = 2

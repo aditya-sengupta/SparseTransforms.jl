@@ -166,7 +166,5 @@ function compute_delayed_wht(signal::InputSignal, M, D)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
     samples_to_transform = map(x -> signal.signal_t[x], inds)
-    print(samples_to_transform)
-    println("hi")
     return fwht.(samples_to_transform), used_inds
 end
