@@ -9,13 +9,10 @@ module SPRIGHT
 
     export transform, method_test, method_report
     using ProgressMeter
-    include("utils.jl")
-    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
-    include("input_signal.jl")
-    export InputSignal
-    include("query.jl")
-    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
     include("reconstruct.jl")
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
+    export InputSignal
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
     export singleton_detection, bin_cardinality
     
     """
@@ -132,7 +129,7 @@ module SPRIGHT
             multitons = [] # list of (i, j) values indicating where multitons are.
             
             for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
-                col_gen = @pipe U |> eachrow |> enumerate
+                col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j

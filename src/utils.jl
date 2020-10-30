@@ -27,7 +27,7 @@ Takes in an integer and returns the corresponding binary array.
 """
 function dec_to_bin(x::Int64, num_bits::Int64)
     @assert x < 2^num_bits "number of bits too small"
-    return @pipe x |> string(_, base=2) |> lpad(_, num_bits, "0") |> split(_, "") |> parse.(Bool, _)
+    return @pipe string(x, base=2) |> lpad(_, num_bits, "0") |> split(_, "") |> parse.(Bool, _)
 end
 
 """

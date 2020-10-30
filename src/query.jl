@@ -6,7 +6,6 @@ Methods for the query generator: specifically, to
 3. compute a subsampled and delayed Walsh-Hadamard transform.
 """
 
-include("utils.jl")
 include("input_signal.jl")
 using StatsBase
 
@@ -82,8 +81,7 @@ Gets a random delays matrix of dimension (num_delays, n). See get_D for full sig
 function get_D_random(n::Int64; kwargs...)
     num_delays = kwargs[:num_delays]
     choices = sample(1:2^n, num_delays, replace=false)
-    return @pipe choices |> dec_to_bin.(_, n) 
-    # map(c -> dec_to_bin(c, n), choices)
+    return dec_to_bin.(choices, n) 
 end
 
 """
