@@ -13,7 +13,7 @@ In order to start using SPRIGHT, the Julia programming language is required, ide
 5. Go to `~/.julia/config/startup.jl` (or the equivalent for a different OS) and add `using Revise` there
 6. `cd` to wherever you cloned the repo and run `julia`
 7. Within the REPL type `]` and run `activate .`
-8. Hit backspace and type using SPRIGHT  - this precompile will take a while but you'll only have to do it once (you may also get warnings about "replacing docs" - I'm working on trying to fix those)
+8. Hit backspace and type `using SPRIGHT`  - this precompile will take a while, but you'll only have to do it once per change to the codebase.
 
 You can now access the `transform` function, which carries out the sparse W-H transform of a signal; this should be the only interface needed for users of SPRIGHT.
 

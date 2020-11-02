@@ -1,13 +1,13 @@
 """
-SPRIGHT decoding main file. Logic flow:
+Sparse transform (FFAST/SPRIGHT) decoding main file. Logic flow:
 
 1. Generate a signal from input_signal.jl
 2. Subsample from query.jl
 3. Peel using reconstruct.jl
 """
-module SPRIGHT
+module SparseTransforms
 
-    export transform, method_test, method_report
+    export spright, ffast, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
@@ -15,6 +15,14 @@ module SPRIGHT
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
     export singleton_detection, bin_cardinality
     
+    function spright(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods, fwht; verbose=verbose, report=report)
+    end
+
+    function ffast(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods, fft; verbose=verbose, report=report)
+    end
+
     """
     Full SPRIGHT encoding and decoding. Implements Algorithms 1 and 2 from [2].
     (numbers) in the comments indicate equation numbers in [2].
@@ -45,6 +53,9 @@ module SPRIGHT
             :noiseless : decode according to [2], section 4.2, with the assumption the signal is noiseless.
             :mle : naive noisy decoding; decode by taking the maximum-likelihood singleton that could be at that bin.
             :nso : reconstruct according to the NSO-SPRIGHT algorithm.
+
+    transform : Function
+    The base transform: either `fwht` or `fft`.
     
     verbose : Bool
     Whether to print intermediate steps.
@@ -57,7 +68,7 @@ module SPRIGHT
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+    function transform(signal::InputSignal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
@@ -86,7 +97,7 @@ module SPRIGHT
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
             D = get_D(signal.n, delays_method; num_delays=num_delays)
-            U, used_i = compute_delayed_wht(signal, M, D) 
+            U, used_i = compute_delayed_transform(signal, M, D, transform) 
             U = hcat(U...)
             push!(Us, U)
             push!(Ss, (-1) .^(D * K))
@@ -165,7 +176,7 @@ module SPRIGHT
             # WARNING: this is not a correct thing to do
             # in the last iteration of peeling, everything will be singletons and there
             # will be no multitons
-            if length(multitons) == 0 # no more multitons, and can construct final WHT
+            if length(multitons) == 0 # no more multitons, and can construct final transform
                 multitons_found = false
             end
                 
@@ -231,12 +242,12 @@ module SPRIGHT
     """
     Tests a method on a signal and reports its average execution time and sample efficiency.
     """
-    function method_test(signal, num_runs=10)
+    function method_test(signal, methods; num_runs=10)
         time_start = time()
         samples = 0
         successes = 0
         for i in ProgressBar(num_runs)
-            wht, num_samples, loc = transform(signal, report=True)
+            wht, num_samples, loc = spright(signal, methods; report=True)
             if loc == set(signal.loc)
                 successes += 1
             end
