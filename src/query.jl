@@ -6,6 +6,9 @@ Methods for the query generator: specifically, to
 3. compute a subsampled and delayed Walsh-Hadamard transform.
 """
 
+# potential TODO figure out how to load in parts of the signal bit by bit
+# see how Amirali did it
+
 include("input_signal.jl")
 using StatsBase
 
@@ -71,8 +74,8 @@ end
 """
 Gets the delays matrix [0; I], of dimension (n+1, n). See get_D for full signature.
 """
-function get_D_identity_like(n::Int64, kwargs...)
-    return Bool.(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
+function get_D_identity_like(n::Int64; kwargs...)
+    return BitArray(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
 end
 
 """
@@ -80,28 +83,31 @@ Gets a random delays matrix of dimension (num_delays, n). See get_D for full sig
 """
 function get_D_random(n::Int64; kwargs...)
     num_delays = kwargs[:num_delays]
-    choices = sample(1:2^n, num_delays, replace=false)
-    return dec_to_bin.(choices, n) 
+    choices = sample(0:2^n-1, num_delays, replace=false)
+    return @pipe dec_to_bin.(choices, n) |> hcat(_...) |> transpose |> BitArray
 end
 
 """
 Get a repetition code based (NSO-SPRIGHT) delays matrix. See get_D for full signature.
+Not sure of correctness based on the paper
 """
 function get_D_nso(n::Int64; kwargs...)
     num_delays = kwargs[:num_delays]
-    p1 = num_delays / n
+    p1 = num_delays ÷ n
     random_offsets = get_D_random(n; num_delays=p1)
-    D = Array{Bool}(undef, 0, n)
+    D = BitArray(undef, 0, n)
     identity_like = get_D_identity_like(n)
-    for row in random_offsets
-        modulated_offsets = mod(row + identity_like, 2)
-        D = vstack(D, modulated_offsets)
+    for row in eachrow(random_offsets)
+        modulated_offsets = @pipe [BitArray(mod.(row + r, 2)) for r in eachrow(identity_like)] |> hcat(_...) |> transpose
+        D = vcat(D, modulated_offsets)
     end
+    return D
 end
 
 get_D_lookup = Dict(
     :identity_like => get_D_identity_like,
-    :random => get_D_random
+    :random => get_D_random,
+    :nso => get_D_nso
 )
 
 """
@@ -110,15 +116,17 @@ Delay generator: gets a delays matrix.
 Arguments
 ---------
 n : Int64
+
 number of bits: log2 of the signal length.
 
 Returns
 -------
 D : num_delays×n Array{Bool,2}
+
 The delays matrix; if num_delays is not specified in kwargs, see the relevant sub-function for a default.
 """
 function get_D(n::Int64, method=:identity_like; kwargs...)
-    return get_D_lookup[method](n)
+    return get_D_lookup[method](n; kwargs...)
 end
 
 """

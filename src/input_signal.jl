@@ -10,6 +10,8 @@ struct InputSignal
     noise_sd::Float64
     signal_w::Array{Float64,1}
     signal_t::Array{Float64,1}
+    # TODO constructor that just specifies n, signal_t
+
     function InputSignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
         N = 2^n
         noise = rand(Normal(0.0, noise_sd), N)
