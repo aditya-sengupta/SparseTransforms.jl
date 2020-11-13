@@ -69,7 +69,7 @@ Computes delayed WHT observations and declares cardinality based on that.
 
 Arguments
 ---------
-signal : InputSignal
+signal : TestSignal
 The input signal object.
 
 M : n×b Array{Bool,2}
@@ -88,7 +88,7 @@ singleton_indices : list
 A list (in decimal form for compactness) of the k values of the singletons. 
 Length matches the number of 1s in cardinality.
 """
-function bin_cardinality(signal::InputSignal, M, D; verbose=false)
+function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
     b = size(M, 2)
     U, inds = compute_delayed_wht(signal, M, D)
     cardinality = ones(Int64, signal.n) # vector of indicators
@@ -111,7 +111,7 @@ function bin_cardinality(signal::InputSignal, M, D; verbose=false)
                 k, sgn = singleton_detection_noiseless(col)
             else
                 selection = @pipe bin_to_dec.(M' * k)' |> findall(==(i), _)
-                k, sgn = singleton_detection(col, method=:mle, selection=selection, S_slice=S[:, selection], n=signal.n)
+                k, sgn = singleton_detection(col, method=method, selection=selection, S_slice=S[:, selection], n=signal.n)
             end
             rho = @pipe col |> abs.(_) |> mean
             residual = col - sgn * rho * (-1).^ (D * k)

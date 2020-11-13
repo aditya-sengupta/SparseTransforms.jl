@@ -6,20 +6,25 @@ Sparse transform (FFAST/SPRIGHT) decoding main file. Logic flow:
 3. Peel using reconstruct.jl
 """
 module SparseTransforms
-
-    export spright, ffast, method_test, method_report
+    export all_methods, spright, ffast, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
-    export InputSignal
+    export Signal, TestSignal, InputSignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
     export singleton_detection, bin_cardinality
+
+    all_methods = Dict(
+        "query" => [:simple],
+        "delays" => [:identity_like, :random, :nso],
+        "reconstruct" => [:noiseless, :mle, :nso]
+    )
     
-    function spright(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+    function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
         return transform(signal, methods, fwht; verbose=verbose, report=report)
     end
 
-    function ffast(signal::InputSignal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+    function ffast(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
         return transform(signal, methods, fft; verbose=verbose, report=report)
     end
 
@@ -29,11 +34,12 @@ module SparseTransforms
 
     Arguments
     ---------
-    signal : InputSignal object.
+    signal : TestSignal object.
     The signal to be transformed / compared to.
 
     methods : Array{Symbol,1}
     The three symbols [query_method, delays_method, reconstruct_method].
+    All implemented methods are available in `all_methods`: if you add a new method, make sure to update `all_methods`.
 
         query_method : Symbol
         The method to generate the sparsity coefficient and the subsampling matrices.
@@ -68,16 +74,21 @@ module SparseTransforms
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::InputSignal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
+            impl_methods = all_methods[method_type]
+            @assert method_name in impl_methods "$method_type method must be in $impl_methods"
+        end
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
+
         num_peeling = 0
         locs = []
         strengths = []
-        wht = zeros(Float64, 2 ^ signal.n)
-        b = get_b(signal, query_method)
-        Ms = get_Ms(signal.n, b, query_method)
+        wht = zeros(Float64, 2^signal.n)
+        b = get_b(signal; method=query_method)
+        Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
 
         Us, Ss = [], []
@@ -96,7 +107,7 @@ module SparseTransforms
 
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
-            D = get_D(signal.n, delays_method; num_delays=num_delays)
+            D = get_D(signal.n; method=delays_method, num_delays=num_delays)
             U, used_i = compute_delayed_transform(signal, M, D, transform) 
             U = hcat(U...)
             push!(Us, U)
@@ -242,7 +253,7 @@ module SparseTransforms
     """
     Tests a method on a signal and reports its average execution time and sample efficiency.
     """
-    function method_test(signal, methods; num_runs=10)
+    function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
         time_start = time()
         samples = 0
         successes = 0
@@ -259,7 +270,7 @@ module SparseTransforms
     """
     Reports the results of a method_test.
     """
-    function method_report(signal::InputSignal, num_runs::Int64=10)
+    function method_report(signal::TestSignal, num_runs::Int64=10)
         println("Testing SPRIGHT with query method $query_method, delays method $delays_method, reconstruct method $reconstruct_method.")
         t, s, sam = method_test(signal, num_runs)
         print("Average time in seconds: ", format(t))

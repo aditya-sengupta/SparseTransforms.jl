@@ -16,7 +16,7 @@ using StatsBase
 A semi-arbitrary fixed choice of the sparsity coefficient. 
 See get_b for full signature.
 """
-function get_b_simple(signal::InputSignal)
+function get_b_simple(signal::Signal)
     return signal.n ÷ 2
 end
 
@@ -29,10 +29,10 @@ Get the sparsity coefficient for the signal.
 
 Arguments
 ---------
-signal : InputSignal
+signal : TestSignal
 The signal whose WHT we want.
 
-method : string
+method : Symbol
 The method to use. All methods referenced must use this signature (minus "method".)
 
 Returns
@@ -40,7 +40,7 @@ Returns
 b : Int64
 The sparsity coefficient.
 """
-function get_b(signal::InputSignal, method=:simple)
+function get_b(signal::Signal; method=:simple)::Int64
     return get_b_lookup[method](signal)
 end
 
@@ -54,7 +54,7 @@ function get_Ms_simple(n::Int64, b::Int64)
 
     Ms = Any[]
     for i in num_to_get-1:-1:0
-        M = zeros(Bool, n, b)
+        M = falses(n, b)
         for j in 1:b
             M[b*i+j, j] = 1
         end
@@ -67,7 +67,7 @@ get_Ms_lookup = Dict(
     :simple => get_Ms_simple
 )
 
-function get_Ms(n::Int64, b::Int64, method=:simple)
+function get_Ms(n::Int64, b::Int64; method=:simple)::Array{BitArray,1}
     return get_Ms_lookup[method](n, b)
 end
 
@@ -91,7 +91,7 @@ end
 Get a repetition code based (NSO-SPRIGHT) delays matrix. See get_D for full signature.
 Not sure of correctness based on the paper
 """
-function get_D_nso(n::Int64; kwargs...)
+function get_D_nso(n::Int64; kwargs...)::BitArray{2}
     num_delays = kwargs[:num_delays]
     p1 = num_delays ÷ n
     random_offsets = get_D_random(n; num_delays=p1)
@@ -125,7 +125,7 @@ D : num_delays×n Array{Bool,2}
 
 The delays matrix; if num_delays is not specified in kwargs, see the relevant sub-function for a default.
 """
-function get_D(n::Int64, method=:identity_like; kwargs...)
+function get_D(n::Int64; method=:identity_like, kwargs...)
     return get_D_lookup[method](n; kwargs...)
 end
 
@@ -156,7 +156,7 @@ and returns the subsample WHT along with the delays.
 
 Arguments
 ---------
-signal : InputSignal
+signal : TestSignal
 The signal to subsample, delay, and compute the WHT of.
 
 M : n×b Array{Bool,2}
@@ -168,15 +168,15 @@ The number of delays to apply; or, the number of rows in the delays matrix.
 force_identity_like : Bool
 Whether to make D = [0; I] like in the noiseless case; for debugging.
 """
-function compute_delayed_wht(signal::InputSignal, M, D)
+function compute_delayed_wht(signal::Signal, M, D)
     return compute_delayed_transform(signal, M, D, fwht)
 end
 
-function compute_delayed_fft(signal::InputSignal, M, D)
+function compute_delayed_fft(signal::Signal, M, D)
     return compute_delayed_transform(signal, M, D, fft)
 end
 
-function compute_delayed_transform(signal::InputSignal, M, D, transform::Function)
+function compute_delayed_transform(signal::Signal, M, D, transform::Function)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
     samples_to_transform = map(x -> signal.signal_t[x], inds)
