@@ -23,9 +23,9 @@ function singleton_detection_mle(U_slice; kwargs...)
     selection, S_slice, n = kwargs[:selection], kwargs[:S_slice], kwargs[:n]
     P = size(S_slice, 1)
     alphas = (1 / P) * S_slice' * U_slice
-    residuals = norm.(U_slice - (alphas * S_slice)') # this is sketch
+    residuals = norm.(U_slice - (S_slice * alphas)) # this is sketch
     k_sel = argmin(residuals)
-    return dec_to_bin(selection[k_sel], n), sign(alphas[k_sel])
+    return dec_to_bin(selection[k_sel] - 1, n), sign(alphas[k_sel])
 end
 
 """
@@ -33,11 +33,11 @@ Non-sample-optimal singleton detection.
 """
 function singleton_detection_nso(U_slice; kwargs...)
     n = kwargs[:n]
-    chunks = reshape(U_slice, (length(U_slice) / (n + 1), n + 1)) |> sign_spright
-    chunks = (@pipe (chunks' + chunks[:,1])' |> mod.(_, 2) |> Bool)[:, 2:n]
-    choices = vstack((sum(chunks, dims=1), sum(flip.(chunks), dims=1)))
-    nso_k = argmin(choices, dims=1)
-    return nso_k, 1
+    chunks = @pipe reshape(U_slice, (length(U_slice) ÷ (n + 1), n + 1)) |> sign_spright.(_)
+    chunks = (@pipe [c + chunks[:,1] for c in eachcol(chunks)] |> vcat(_...) |> mod.(_, 2) |> Bool.(_))[2:n+1,:]
+    choices = vcat((sum(chunks, dims=1), sum(.!(chunks), dims=1)))
+    nso_k = argmin(choices, dims=1)[1]
+    return dec_to_bin(nso_k - 1, n), 1
 end
 
 singleton_detection_lookup = Dict(
@@ -59,8 +59,8 @@ Returns
 k : n-element Array{Bool,1}
 Index of the corresponding right node.
 """
-function singleton_detection(U_slice, method=:mle; kwargs...)
-    return singleton_detection_lookup[method](U_slice; kwargs)
+function singleton_detection(U_slice; method=:mle, kwargs...)
+    return singleton_detection_lookup[method](U_slice; kwargs...)
 end
 
 """

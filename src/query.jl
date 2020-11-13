@@ -89,7 +89,7 @@ end
 
 """
 Get a repetition code based (NSO-SPRIGHT) delays matrix. See get_D for full signature.
-Not sure of correctness based on the paper
+Not sure of correctness based on the paper: this is not (num_delays, n).
 """
 function get_D_nso(n::Int64; kwargs...)::BitArray{2}
     num_delays = kwargs[:num_delays]

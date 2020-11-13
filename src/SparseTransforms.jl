@@ -9,9 +9,9 @@ module SparseTransforms
     export all_methods, spright, ffast, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
-    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, flip
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright
     export Signal, TestSignal, InputSignal
-    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_wht
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_transform
     export singleton_detection, bin_cardinality
 
     all_methods = Dict(
@@ -77,7 +77,7 @@ module SparseTransforms
     function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
         for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
             impl_methods = all_methods[method_type]
-            @assert method_name in impl_methods "$method_type method must be in $impl_methods"
+            @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
@@ -156,8 +156,8 @@ module SparseTransforms
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
                         k, sgn = singleton_detection(
-                            col, 
-                            reconstruct_method; 
+                            col;
+                            method=reconstruct_method,
                             selection=selection, 
                             S_slice=S[:, selection], 
                             n=signal.n
@@ -181,7 +181,7 @@ module SparseTransforms
                     println(ston_key, bin_to_dec(ston_value[1]))
                 end
 
-                println("Multitons : ", multitons)
+                println("Multitons : $multitons")
             end
             
             # WARNING: this is not a correct thing to do
@@ -223,7 +223,7 @@ module SparseTransforms
                     U_slice = U[peel, :]
                     Us[l][peel,:] = U_slice - to_subtract
                     if verbose
-                        println("Peeled ball ", bin_to_dec(k), " off bin (", l, ", ", peel, ")")
+                        println("Peeled ball $(bin_to_dec(k)) off bin ($l, $peel)")
                     end
                 end # for peel
             end # for ball
@@ -236,6 +236,7 @@ module SparseTransforms
             if wht[idx+1] == 0
                 wht[idx+1] = value
             else
+                # todo robustify
                 wht[idx+1] = (wht[idx+1] + value) / 2 
                 # average out noise; e.g. in the example in 3.2, U1[11] and U2[11] are the same singleton,
                 # so averaging them reduces the effect of noise.
