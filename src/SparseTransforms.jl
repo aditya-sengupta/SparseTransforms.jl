@@ -1,29 +1,45 @@
 """
-SPRIGHT decoding main file. Logic flow:
+Sparse transform (FFAST/SPRIGHT) decoding main file. Logic flow:
 
 1. Generate a signal from input_signal.jl
 2. Subsample from query.jl
 3. Peel using reconstruct.jl
 """
-module SPRIGHT
-
-    export transform, method_test, method_report
+module SparseTransforms
+    export all_methods, spright, ffast, method_test, method_report
     using ProgressMeter
-    include("utils.jl")
-    include("query.jl")
     include("reconstruct.jl")
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright
+    export Signal, TestSignal, InputSignal
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_transform
+    export singleton_detection, bin_cardinality
+
+    all_methods = Dict(
+        "query" => [:simple],
+        "delays" => [:identity_like, :random, :nso],
+        "reconstruct" => [:noiseless, :mle, :nso]
+    )
     
+    function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods, fwht; verbose=verbose, report=report)
+    end
+
+    function ffast(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods, fft; verbose=verbose, report=report)
+    end
+
     """
     Full SPRIGHT encoding and decoding. Implements Algorithms 1 and 2 from [2].
     (numbers) in the comments indicate equation numbers in [2].
 
     Arguments
     ---------
-    signal : InputSignal object.
+    signal : TestSignal object.
     The signal to be transformed / compared to.
 
     methods : Array{Symbol,1}
     The three symbols [query_method, delays_method, reconstruct_method].
+    All implemented methods are available in `all_methods`: if you add a new method, make sure to update `all_methods`.
 
         query_method : Symbol
         The method to generate the sparsity coefficient and the subsampling matrices.
@@ -43,6 +59,9 @@ module SPRIGHT
             :noiseless : decode according to [2], section 4.2, with the assumption the signal is noiseless.
             :mle : naive noisy decoding; decode by taking the maximum-likelihood singleton that could be at that bin.
             :nso : reconstruct according to the NSO-SPRIGHT algorithm.
+
+    transform : Function
+    The base transform: either `fwht` or `fft`.
     
     verbose : Bool
     Whether to print intermediate steps.
@@ -55,15 +74,21 @@ module SPRIGHT
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::InputSignal, methods::Array{Symbol,1}, verbose::Bool=false, report::Bool=False)
+    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
+            impl_methods = all_methods[method_type]
+            @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
+        end
         query_method, delays_method, reconstruct_method = methods
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
+
         num_peeling = 0
-        result = []
-        wht = zeros(Float64, [signal.n])
-        b = get_b(signal, method=query_method)
-        Ms = get_Ms(signal.n, b, method=query_method)
+        locs = []
+        strengths = []
+        wht = zeros(Float64, 2^signal.n)
+        b = get_b(signal; method=query_method)
+        Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
 
         Us, Ss = [], []
@@ -72,6 +97,7 @@ module SPRIGHT
         if report
             used = Set()
         end
+        
         if delays_method != :nso
             num_delays = signal.n + 1
         else
@@ -81,29 +107,26 @@ module SPRIGHT
 
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
-            D = get_D(signal.n, method=delays_method; num_delays=num_delays)
-            if verbose
-                println("-----")
-                println("a delay matrix")
-                println(D)
-            end
-            U, used_i = compute_delayed_wht(signal, M, D)
-            append!(Us, U)
-            append!(Ss, (-1) .^(D ⋅ K))
+            D = get_D(signal.n; method=delays_method, num_delays=num_delays)
+            U, used_i = compute_delayed_transform(signal, M, D, transform) 
+            U = hcat(U...)
+            push!(Us, U)
+            push!(Ss, (-1) .^(D * K))
             if report
                 used = union(used, used_i)
             end
         end
 
         cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
-        if verbose
-            println("cutoff = ", cutoff)
-        end
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
-        select_froms = map(M -> bin_to_dec.(M' ⋅ K)', Ms)
+        select_froms = []
+        for M in Ms
+            selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
+            push!(select_froms, selects)
+        end
         # `select_froms` is the collection of 'j' values and associated indices
-        # so that we can quickly choose from the coefficient locations such that M.T @ k = j as in (20)
+        # so that we can quickly choose from the coefficient locations such that M.T * k = j as in (20)
         # example: ball j goes to bin at "select_froms[i][j]"" in stage i
         
         # begin peeling
@@ -118,46 +141,34 @@ module SPRIGHT
         # e.g. the singleton (0, 0), which in the example of section 3.2 is X[0100] + W1[00]
         # would be stored as the dictionary entry (0, 0): array([0, 1, 0, 0]).
         
-        multitons_found = True
+        multitons_found = true
         iters = 0
         max_iters = 2 ^ (b + 1)
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
-            if verbose
-                println("-----")
-                println("the measurement matrix")
-                for U in Us
-                    println(U)
-                end
-            end
             
             # first step: find all the singletons and multitons.
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
             
             for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
-                for (j, col) in enumerate(U.T)
+                col_gen = U |> eachrow |> enumerate
+                for (j, col) in col_gen
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
                         k, sgn = singleton_detection(
-                            col, 
-                            method=self.reconstruct_method; 
+                            col;
+                            method=reconstruct_method,
                             selection=selection, 
                             S_slice=S[:, selection], 
                             n=signal.n
                         ) # find the best fit singleton
                         k_dec = bin_to_dec(k)
-                        rho = (S[:,k_dec] ⋅ col) * sgn / length(col)                    
-                        residual = col - sgn * rho * S[:,k_dec] 
-                        if verbose
-                            println((i, j), np.inner(residual, residual))
-                        end
+                        ρ = (S[:,k_dec+1] ⋅ col) * sgn / length(col)  
+                        residual = col - sgn * ρ * S[:,k_dec+1] 
                         if residual ⋅ residual > cutoff
-                            append!(multitons, (i, j))
+                            push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, rho, sgn)
-                            if verbose
-                                print("amplitude, ", rho)
-                            end
+                            singletons[[i, j]] = (k, ρ, sgn)
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
@@ -165,18 +176,18 @@ module SPRIGHT
                             
             # all singletons and multitons are discovered
             if verbose
-                println("singletons:")
+                println("Singletons:")
                 for (ston_key, ston_value) in singletons
                     println(ston_key, bin_to_dec(ston_value[1]))
                 end
 
-                println("Multitons : ", multitons)
+                println("Multitons : $multitons")
             end
             
             # WARNING: this is not a correct thing to do
             # in the last iteration of peeling, everything will be singletons and there
             # will be no multitons
-            if length(multitons) == 0 # no more multitons, and can construct final WHT
+            if length(multitons) == 0 # no more multitons, and can construct final transform
                 multitons_found = false
             end
                 
@@ -185,45 +196,48 @@ module SPRIGHT
             ball_values = Dict()
             ball_sgn = Dict()
             for (_, (k, rho, sgn)) in singletons
-                push!(balls_to_peel, bin_to_dec(k))
+                ball = bin_to_dec(k)
+                push!(balls_to_peel, ball)
                 ball_values[ball] = rho
                 ball_sgn[ball] = sgn
             end
                 
             if verbose
-                println("these balls will be peeled")
-                print(balls_to_peel)
+                println("Balls to be peeled")
+                println(balls_to_peel)
             end
             # peel
             iters += 1
             for ball in balls_to_peel
                 num_peeling += 1
                 k = dec_to_bin(ball, signal.n)
-                potential_peels = [(l, bin_to_dec(M.T.dot(k))) for (l, M) in enumerate(Ms)]
 
-                append!(result, (k, ball_sgn[ball]*ball_values[ball]))
+                push!(locs, k)
+                push!(strengths, ball_sgn[ball]*ball_values[ball])
                 
-                for peel in potential_peels
-                    signature_in_stage = Ss[peel[0]][:,ball]
+                for (l, M) in enumerate(Ms)
+                    peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
+                    signature_in_stage = Ss[l][:,ball+1]
                     to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
-                    Us[peel[0]][:,peel[1]] -= to_subtract
+                    U = Us[l]
+                    U_slice = U[peel, :]
+                    Us[l][peel,:] = U_slice - to_subtract
                     if verbose
-                        println("this is subtracted:")
-                        println(to_subtract)
-                        println("Peeled ball ", bin_to_dec(k), " off bin ", peel)
+                        println("Peeled ball $(bin_to_dec(k)) off bin ($l, $peel)")
                     end
                 end # for peel
             end # for ball
         end # while
             
         loc = Set()
-        for (k, value) in result # iterating over (i, j)s
+        for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if wht[idx] == 0
-                wht[idx] = value
+            if wht[idx+1] == 0
+                wht[idx+1] = value
             else
-                wht[idx] = (wht[idx] + value) / 2 
+                # todo robustify
+                wht[idx+1] = (wht[idx+1] + value) / 2 
                 # average out noise; e.g. in the example in 3.2, U1[11] and U2[11] are the same singleton,
                 # so averaging them reduces the effect of noise.
             end
@@ -240,12 +254,12 @@ module SPRIGHT
     """
     Tests a method on a signal and reports its average execution time and sample efficiency.
     """
-    function method_test(signal, num_runs=10)
+    function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
         time_start = time()
         samples = 0
         successes = 0
         for i in ProgressBar(num_runs)
-            wht, num_samples, loc = transform(signal, report=True)
+            wht, num_samples, loc = spright(signal, methods; report=True)
             if loc == set(signal.loc)
                 successes += 1
             end
@@ -257,7 +271,7 @@ module SPRIGHT
     """
     Reports the results of a method_test.
     """
-    function method_report(signal::InputSignal, num_runs::Int64=10)
+    function method_report(signal::TestSignal, num_runs::Int64=10)
         println("Testing SPRIGHT with query method $query_method, delays method $delays_method, reconstruct method $reconstruct_method.")
         t, s, sam = method_test(signal, num_runs)
         print("Average time in seconds: ", format(t))

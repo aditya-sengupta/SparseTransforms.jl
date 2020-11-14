@@ -1,4 +1,5 @@
 using LinearAlgebra
+using FFTW
 using Pipe.Pipe
 
 """
@@ -18,7 +19,7 @@ end
 """
 Takes in a binary array and returns the corresponding integer. 
 """
-function bin_to_dec(x::Array{Bool,1})
+function bin_to_dec(x::AbstractArray{Bool})
     return 2 .^(length(x)-1 : -1 : 0) ⋅ x
 end
 
@@ -27,7 +28,7 @@ Takes in an integer and returns the corresponding binary array.
 """
 function dec_to_bin(x::Int64, num_bits::Int64)
     @assert x < 2^num_bits "number of bits too small"
-    return @pipe x |> string(_, base=2) |> lpad(_, num_bits, "0") |> split(_, "") |> parse.(Bool, _)
+    return @pipe string(x, base=2) |> lpad(_, num_bits, "0") |> split(_, "") |> parse.(Bool, _)
 end
 
 """
@@ -35,20 +36,13 @@ Returns a matrix where row 'i' is dec_to_bin(i, m),
 for i from 0 to 2 ** m - 1.
 """
 function binary_ints(m::Int64)
-    return @pipe 0:2^m-1 |> dec_to_bin.(_, m) |> hcat(_...)'
+    return @pipe 0:2^m-1 |> dec_to_bin.(_, m) |> hcat(_...)
 end
 
 """
 Sign function that matches the convention (footnote 2 on page 11):
 returns 0 for positive reals and 1 for negative reals.
 """
-function sign_spright(x::Int64)
+function sign_spright(x)
     return Int64(x < 0)
-end
-
-"""
-Flip every bit in a boolean array.
-"""
-function flip(x::Array{Bool,1})
-    return map(y -> !y, x)
 end

@@ -6,7 +6,9 @@ Methods for the query generator: specifically, to
 3. compute a subsampled and delayed Walsh-Hadamard transform.
 """
 
-include("utils.jl")
+# potential TODO figure out how to load in parts of the signal bit by bit
+# see how Amirali did it
+
 include("input_signal.jl")
 using StatsBase
 
@@ -14,8 +16,8 @@ using StatsBase
 A semi-arbitrary fixed choice of the sparsity coefficient. 
 See get_b for full signature.
 """
-function get_b_simple(signal::InputSignal)
-    return signal.n / 2
+function get_b_simple(signal::Signal)
+    return signal.n ÷ 2
 end
 
 get_b_lookup = Dict(
@@ -27,10 +29,10 @@ Get the sparsity coefficient for the signal.
 
 Arguments
 ---------
-signal : InputSignal
+signal : TestSignal
 The signal whose WHT we want.
 
-method : string
+method : Symbol
 The method to use. All methods referenced must use this signature (minus "method".)
 
 Returns
@@ -38,23 +40,24 @@ Returns
 b : Int64
 The sparsity coefficient.
 """
-function get_b(signal::InputSignal, method=:simple)
-    return get_b_lookup.get(method)(signal)
+function get_b(signal::Signal; method=:simple)::Int64
+    return get_b_lookup[method](signal)
 end
 
 """
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
-function get_Ms_simple(n::Int64, b::Int64, num_to_get::Int64 = nothing)
-    @assert n % b == 0, "b must be exactly divisible by n"
-    if isnothing(num_to_get)
-        num_to_get = n / b
-    end
+function get_Ms_simple(n::Int64, b::Int64)
+    
+    @assert n % b == 0 "b must be exactly divisible by n"
+    num_to_get = n ÷ b
 
     Ms = Any[]
-    for i in num_to_get-1:-1:-1
-        M = zeros(n, b)
-        M[(b * i):(b * (i + 1)), :] = I
+    for i in num_to_get-1:-1:0
+        M = falses(n, b)
+        for j in 1:b
+            M[b*i+j, j] = 1
+        end
         push!(Ms, M)
     end
     return Ms
@@ -64,15 +67,15 @@ get_Ms_lookup = Dict(
     :simple => get_Ms_simple
 )
 
-function get_Ms(signal::InputSignal, method=:simple)
-    return get_Ms_lookup.get(method)(signal)
+function get_Ms(n::Int64, b::Int64; method=:simple)::Array{BitArray,1}
+    return get_Ms_lookup[method](n, b)
 end
 
 """
 Gets the delays matrix [0; I], of dimension (n+1, n). See get_D for full signature.
 """
-function get_D_standard(n::Int64, kwargs...)
-    return Bool.(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
+function get_D_identity_like(n::Int64; kwargs...)
+    return BitArray(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
 end
 
 """
@@ -80,29 +83,31 @@ Gets a random delays matrix of dimension (num_delays, n). See get_D for full sig
 """
 function get_D_random(n::Int64; kwargs...)
     num_delays = kwargs[:num_delays]
-    choices = sample(1:2^n, num_delays, replace=false)
-    return @pipe choices |> dec_to_bin.(_, n) 
-    # map(c -> dec_to_bin(c, n), choices)
+    choices = sample(0:2^n-1, num_delays, replace=false)
+    return @pipe dec_to_bin.(choices, n) |> hcat(_...) |> transpose |> BitArray
 end
 
 """
 Get a repetition code based (NSO-SPRIGHT) delays matrix. See get_D for full signature.
+Not sure of correctness based on the paper: this is not (num_delays, n).
 """
-function get_D_nso(n::Int64; kwargs...)
+function get_D_nso(n::Int64; kwargs...)::BitArray{2}
     num_delays = kwargs[:num_delays]
-    p1 = num_delays / n
+    p1 = num_delays ÷ n
     random_offsets = get_D_random(n; num_delays=p1)
-    D = Array{Bool}(undef, 0, n)
+    D = BitArray(undef, 0, n)
     identity_like = get_D_identity_like(n)
-    for row in random_offsets
-        modulated_offsets = mod(row + identity_like, 2)
-        D = vstack(D, modulated_offsets)
+    for row in eachrow(random_offsets)
+        modulated_offsets = @pipe [BitArray(mod.(row + r, 2)) for r in eachrow(identity_like)] |> hcat(_...) |> transpose
+        D = vcat(D, modulated_offsets)
     end
+    return D
 end
 
 get_D_lookup = Dict(
-    :standard => get_D_standard,
-    :random => get_D_random
+    :identity_like => get_D_identity_like,
+    :random => get_D_random,
+    :nso => get_D_nso
 )
 
 """
@@ -111,15 +116,17 @@ Delay generator: gets a delays matrix.
 Arguments
 ---------
 n : Int64
+
 number of bits: log2 of the signal length.
 
 Returns
 -------
 D : num_delays×n Array{Bool,2}
+
 The delays matrix; if num_delays is not specified in kwargs, see the relevant sub-function for a default.
 """
-function get_D(n::Int64, method=:standard; kwargs...)
-    return get_D_lookup.get(method)(n)
+function get_D(n::Int64; method=:identity_like, kwargs...)
+    return get_D_lookup[method](n; kwargs...)
 end
 
 """
@@ -139,8 +146,8 @@ The (decimal) subsample indices.
 """
 function subsample_indices(M, d)
     L = binary_ints(size(M, 2))
-    inds_binary = mod(M⋅L + d, 2)
-    return bin_to_dec(inds_binary)
+    inds_binary = @pipe M*L .+ d |> mod.(_, 2) |> Bool.(_)
+    return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_) .+ 1
 end
 
 """
@@ -149,7 +156,7 @@ and returns the subsample WHT along with the delays.
 
 Arguments
 ---------
-signal : InputSignal
+signal : TestSignal
 The signal to subsample, delay, and compute the WHT of.
 
 M : n×b Array{Bool,2}
@@ -161,9 +168,17 @@ The number of delays to apply; or, the number of rows in the delays matrix.
 force_identity_like : Bool
 Whether to make D = [0; I] like in the noiseless case; for debugging.
 """
-function compute_delayed_wht(signal::InputSignal, M, D)
-    inds = map(d -> subsample_indices(M, d), D)
-    used_inds = Set(inds)
-    samples_to_transform = signal.signal_t[inds]
-    return fwht.(samples_to_transform), used_inds
+function compute_delayed_wht(signal::Signal, M, D)
+    return compute_delayed_transform(signal, M, D, fwht)
+end
+
+function compute_delayed_fft(signal::Signal, M, D)
+    return compute_delayed_transform(signal, M, D, fft)
+end
+
+function compute_delayed_transform(signal::Signal, M, D, transform::Function)
+    inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
+    used_inds = reduce(union, inds)
+    samples_to_transform = map(x -> signal.signal_t[x], inds)
+    return transform.(samples_to_transform), used_inds
 end
