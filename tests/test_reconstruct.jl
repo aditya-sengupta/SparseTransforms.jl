@@ -1,6 +1,7 @@
 using SparseTransforms
 using Test
 using Pipe.Pipe
+using LinearAlgebra
 
 query_method = :simple
 delays_method = :identity_like
