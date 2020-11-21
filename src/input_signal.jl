@@ -29,9 +29,10 @@ end
 struct InputSignal <: Signal
     n::Int64
     signal_t::Array{Float64,1}
+    noise_sd::Float64
 
-    function InputSignal(signal_t::Array{Float64,1})
+    function InputSignal(signal_t::Array{Float64,1}, noise_sd::Float64)
         n = length(signal_t) |> log2 |> ceil |> Int64
-        new(n, signal_t)
+        new(n, signal_t, noise_sd)
     end
 end
