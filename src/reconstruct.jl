@@ -23,7 +23,8 @@ function singleton_detection_mle(U_slice; kwargs...)
     selection, S_slice, n = kwargs[:selection], kwargs[:S_slice], kwargs[:n]
     P = size(S_slice, 1)
     alphas = (1 / P) * S_slice' * U_slice
-    residuals = norm.(U_slice - (S_slice * alphas)) # this is sketch
+    residual_vecs = (S_slice * Diagonal(alphas)) .- U_slice
+    residuals = dropdims(sum(abs2, residual_vecs, dims=1); dims=1)
     k_sel = argmin(residuals)
     return dec_to_bin(selection[k_sel] - 1, n), sign(alphas[k_sel])
 end
@@ -85,7 +86,7 @@ cardinality : numpy.ndarray
 0 or 1 if the bin is a zeroton or singleton resp.; 2 if multiton.
 
 singleton_indices : list
-A list (in decimal form for compactness) of the k values of the singletons. 
+A list (in decimal form for compactness) of the k values of the singletons.
 Length matches the number of 1s in cardinality.
 """
 function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
@@ -106,7 +107,7 @@ function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
         end
         if col ⋅ col <= cutoff
             cardinality[i] = 0
-        else 
+        else
             if signal.noise_sd == 0
                 k, sgn = singleton_detection_noiseless(col)
             else
@@ -118,7 +119,7 @@ function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
             if verbose
                 println("Residual: ", residual)
             end
-            if residual ⋅ residual > cutoff 
+            if residual ⋅ residual > cutoff
                 cardinality[i] = 2
             else
                 append!(singleton_indices, bin_to_dec(k))
