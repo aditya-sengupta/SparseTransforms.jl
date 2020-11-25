@@ -13,7 +13,7 @@ include("input_signal.jl")
 using StatsBase
 
 """
-A semi-arbitrary fixed choice of the sparsity coefficient. 
+A semi-arbitrary fixed choice of the sparsity coefficient.
 See get_b for full signature.
 """
 function get_b_simple(signal::Signal)
@@ -48,7 +48,7 @@ end
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
 function get_Ms_simple(n::Int64, b::Int64)
-    
+
     @assert n % b == 0 "b must be exactly divisible by n"
     num_to_get = n ÷ b
 
@@ -98,7 +98,7 @@ function get_D_nso(n::Int64; kwargs...)::BitArray{2}
     D = BitArray(undef, 0, n)
     identity_like = get_D_identity_like(n)
     for row in eachrow(random_offsets)
-        modulated_offsets = @pipe [BitArray(mod.(row + r, 2)) for r in eachrow(identity_like)] |> hcat(_...) |> transpose
+        modulated_offsets = @pipe [(row .⊻ r) for r in eachrow(identity_like)] |> hcat(_...) |> transpose
         D = vcat(D, modulated_offsets)
     end
     return D
@@ -146,7 +146,7 @@ The (decimal) subsample indices.
 """
 function subsample_indices(M, d)
     L = binary_ints(size(M, 2))
-    inds_binary = @pipe M*L .+ d |> mod.(_, 2) |> Bool.(_)
+    inds_binary = Bool.(M*L .⊻ d)
     return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_) .+ 1
 end
 

@@ -35,7 +35,7 @@ Non-sample-optimal singleton detection.
 function singleton_detection_nso(U_slice; kwargs...)
     n = kwargs[:n]
     chunks = @pipe reshape(U_slice, (length(U_slice) ÷ (n + 1), n + 1)) |> sign_spright.(_)
-    chunks = (@pipe [c + chunks[:,1] for c in eachcol(chunks)] |> vcat(_...) |> mod.(_, 2) |> Bool.(_))[2:n+1,:]
+    chunks = (@pipe [c .⊻ chunks[:,1] for c in eachcol(chunks)] |> vcat(_...) |> Bool.(_))[2:n+1,:]
     choices = vcat((sum(chunks, dims=1), sum(.!(chunks), dims=1)))
     nso_k = argmin(choices, dims=1)[1]
     return dec_to_bin(nso_k - 1, n), 1
