@@ -21,7 +21,7 @@ function test_spright()
     bin_cardinalities = map(M -> bin_cardinality(signal, M, D), Ms)
 
     println("Testing full transform...")
-    methods = [:simple, :identity_like, :noiseless]
+    methods = [:simple, :nso, :nso]
     spright_wht = spright(signal, methods; verbose=true)
 
     println("Checking transform result...")

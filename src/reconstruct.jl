@@ -37,7 +37,7 @@ function singleton_detection_nso(U_slice; kwargs...)
     p1 = length(U_slice) ÷ (n + 1)
     chunks = @pipe reshape(U_slice, (n + 1, p1)) |> transpose |> sign_spright.(_)
     chunks = chunks[:,2:n+1] .⊻ chunks[:,1]
-    est = @pipe sum(chunks, dims=1) |> (_ .> (p1 ÷ 2))
+    est = @pipe sum(chunks, dims=1) |> dropdims(_, dims=1) |> (_ .> (p1 ÷ 2))
     return est, 1
 end
 
