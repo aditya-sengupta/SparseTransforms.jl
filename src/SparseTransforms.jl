@@ -11,7 +11,7 @@ module SparseTransforms
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright
     export Signal, TestSignal, InputSignal
-    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_transform
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
     all_methods = Dict(
@@ -74,7 +74,7 @@ module SparseTransforms
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+    function transform(signal::Signal, methods::Array{Symbol,1}, subtransform::Function; verbose::Bool=false, report::Bool=false)
         for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
@@ -109,7 +109,7 @@ module SparseTransforms
 
         # subsample, make the observation [U] matrices
         for M in Ms
-            U, used_i = compute_delayed_transform(signal, M, D, transform)
+            U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
             U = hcat(U...)
             push!(Us, U)
             if report

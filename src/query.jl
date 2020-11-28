@@ -169,16 +169,16 @@ force_identity_like : Bool
 Whether to make D = [0; I] like in the noiseless case; for debugging.
 """
 function compute_delayed_wht(signal::Signal, M, D)
-    return compute_delayed_transform(signal, M, D, fwht)
+    return compute_delayed_subtransform(signal, M, D, fwht)
 end
 
 function compute_delayed_fft(signal::Signal, M, D)
-    return compute_delayed_transform(signal, M, D, fft)
+    return compute_delayed_subtransform(signal, M, D, fft)
 end
 
-function compute_delayed_transform(signal::Signal, M, D, transform::Function)
+function compute_delayed_subtransform(signal::Signal, M, D, subtransform::Function)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
     samples_to_transform = map(x -> signal.signal_t[x], inds)
-    return transform.(samples_to_transform), used_inds
+    return subtransform.(samples_to_transform), used_inds
 end
