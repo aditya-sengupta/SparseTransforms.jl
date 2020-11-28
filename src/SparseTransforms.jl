@@ -107,16 +107,6 @@ module SparseTransforms
             S = (-1) .^(D * K)
         end
 
-        # subsample, make the observation [U] matrices
-        for M in Ms
-            U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
-            U = hcat(U...)
-            push!(Us, U)
-            if report
-                used = union(used, used_i)
-            end
-        end
-
         cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
@@ -144,16 +134,24 @@ module SparseTransforms
         # e.g. the singleton (0, 0), which in the example of section 3.2 is X[0100] + W1[00]
         # would be stored as the dictionary entry (0, 0): array([0, 1, 0, 0]).
 
-        multitons_found = true
+        singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
+        multitons = [] # list of (i, j) values indicating where multitons are.
         iters = 0
         max_iters = 2 ^ (b + 1)
-        while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
-
+        active_modes = Set{Int64}()
+        Us = Any[]
+        while (length(multitons) > 0 || length(active_modes) < 2^b) && (num_peeling < peeling_max) && (iters < max_iters)
             # first step: find all the singletons and multitons.
-            singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
-            multitons = [] # list of (i, j) values indicating where multitons are.
-
-            for (i, (U, select_from)) in enumerate(zip(Us, select_froms))
+            for (i, (M, select_from)) in enumerate(zip(Ms, select_froms))
+                if length(Us) < i
+                    U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
+                    push!(Us, U)
+                    if report
+                        used = union(used, used_i)
+                    end
+                else
+                    U = Us[i]
+                end
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
@@ -176,6 +174,7 @@ module SparseTransforms
                             push!(multitons, [i, j])
                         else # declare as singleton
                             singletons[[i, j]] = (k, ρ, sgn)
+                            active_modes = union(active_modes, bin_to_dec(k))
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
@@ -183,6 +182,8 @@ module SparseTransforms
 
             # all singletons and multitons are discovered
             if verbose
+                println("All active modes:")
+                println(active_modes)
                 println("Singletons:")
                 for (ston_key, ston_value) in singletons
                     println(ston_key, bin_to_dec(ston_value[1]))
@@ -191,12 +192,8 @@ module SparseTransforms
                 println("Multitons : $multitons")
             end
 
-            # WARNING: this is not a correct thing to do
             # in the last iteration of peeling, everything will be singletons and there
             # will be no multitons
-            if length(multitons) == 0 # no more multitons, and can construct final transform
-                multitons_found = false
-            end
 
             # balls to peel
             balls_to_peel = Set()
@@ -220,7 +217,7 @@ module SparseTransforms
                 k = dec_to_bin(ball, signal.n)
 
                 push!(locs, k)
-                push!(strengths, ball_sgn[ball]*ball_values[ball])
+                push!(strengths, ball_sgn[ball]*ball_values[ball] / 2 ^ (signal.n - b))
 
                 for (l, M) in enumerate(Ms)
                     peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
@@ -234,6 +231,8 @@ module SparseTransforms
                     end
                 end # for peel
             end # for ball
+            println()
+            println("Peeling round ended: identified locs $(bin_to_dec.(locs)) and strengths $strengths")
         end # while
 
         loc = Set()
@@ -245,7 +244,7 @@ module SparseTransforms
             end
         end
 
-        wht = Dict(i => x / (2 ^ (signal.n - b)) for (i,x) in wht)
+        # wht = Dict(i => x / (2 ^ (signal.n - b)) for (i,x) in wht)
         if report
             return wht, len(used), loc
         else
