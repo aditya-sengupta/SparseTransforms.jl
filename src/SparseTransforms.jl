@@ -19,7 +19,7 @@ module SparseTransforms
         "delays" => [:identity_like, :random, :nso],
         "reconstruct" => [:noiseless, :mle, :nso]
     )
-    
+
     function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
         return transform(signal, methods, fwht; verbose=verbose, report=report)
     end
@@ -43,7 +43,7 @@ module SparseTransforms
 
         query_method : Symbol
         The method to generate the sparsity coefficient and the subsampling matrices.
-        Currently implemented methods: 
+        Currently implemented methods:
             :simple : choose some predetermined matrices based on problem size.
 
         delays_method : Symbol
@@ -62,7 +62,7 @@ module SparseTransforms
 
     transform : Function
     The base transform: either `fwht` or `fft`.
-    
+
     verbose : Bool
     Whether to print intermediate steps.
 
@@ -86,32 +86,36 @@ module SparseTransforms
         num_peeling = 0
         locs = []
         strengths = []
-        wht = zeros(Float64, 2^signal.n)
+        wht = Dict()
         b = get_b(signal; method=query_method)
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
 
         Us, Ss = [], []
-        singletons = Dict()
-        multitons = []
         if report
             used = Set()
         end
-        
+
         if delays_method != :nso
             num_delays = signal.n + 1
         else
             num_delays = signal.n * Int64(log2(signal.n)) # idk
         end
-        K = binary_ints(signal.n)
+        if reconstruct_method == :mle
+            K = binary_ints(signal.n)
+        end
+        D = get_D(signal.n; method=delays_method, num_delays=num_delays)
 
         # subsample, make the observation [U] and offset signature [S] matrices
         for M in Ms
-            D = get_D(signal.n; method=delays_method, num_delays=num_delays)
-            U, used_i = compute_delayed_transform(signal, M, D, transform) 
+            U, used_i = compute_delayed_transform(signal, M, D, transform)
             U = hcat(U...)
             push!(Us, U)
-            push!(Ss, (-1) .^(D * K))
+            S = 0
+            if reconstruct_method == :mle
+                S = (-1) .^(D * K)
+            end
+            push!(Ss, S)
             if report
                 used = union(used, used_i)
             end
@@ -122,49 +126,56 @@ module SparseTransforms
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
         for M in Ms
-            selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
+            selects = 0
+            if reconstruct_method == :mle
+                selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
+            end
             push!(select_froms, selects)
         end
         # `select_froms` is the collection of 'j' values and associated indices
         # so that we can quickly choose from the coefficient locations such that M.T * k = j as in (20)
         # example: ball j goes to bin at "select_froms[i][j]"" in stage i
-        
+
         # begin peeling
         # index convention for peeling: 'i' goes over all M/U/S values
         # i.e. it refers to the index of the subsampling group (zero-indexed - off by one from the paper).
         # 'j' goes over all columns of the WHT subsample matrix, going from 0 to 2 ** b - 1.
         # e.g. (i, j) = (0, 2) refers to subsampling group 0, and aliased bin 2 (10 in binary)
         # which in the example of section 3.2 is the multiton X[0110] + X[1010] + W1[10]
-        
+
         # a multiton will just store the (i, j)s in a list
         # a singleton will map from the (i, j)s to the true (binary) values k.
         # e.g. the singleton (0, 0), which in the example of section 3.2 is X[0100] + W1[00]
         # would be stored as the dictionary entry (0, 0): array([0, 1, 0, 0]).
-        
+
         multitons_found = true
         iters = 0
         max_iters = 2 ^ (b + 1)
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
-            
+
             # first step: find all the singletons and multitons.
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
-            
+
             for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
                         selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
+                        slice = 0
+                        if reconstruct_method == :mle
+                            slice = S[:, selection]
+                        end
                         k, sgn = singleton_detection(
                             col;
                             method=reconstruct_method,
-                            selection=selection, 
-                            S_slice=S[:, selection], 
+                            selection=selection,
+                            S_slice=slice,
                             n=signal.n
                         ) # find the best fit singleton
-                        k_dec = bin_to_dec(k)
-                        ρ = (S[:,k_dec+1] ⋅ col) * sgn / length(col)  
-                        residual = col - sgn * ρ * S[:,k_dec+1] 
+                        s_k = (-1) .^ (D * k)
+                        ρ = (s_k ⋅ col) * sgn / length(col)
+                        residual = col - sgn * ρ * s_k
                         if residual ⋅ residual > cutoff
                             push!(multitons, [i, j])
                         else # declare as singleton
@@ -173,7 +184,7 @@ module SparseTransforms
                     end # if col norm > cutoff
                 end # for col
             end # for U, S, select_from
-                            
+
             # all singletons and multitons are discovered
             if verbose
                 println("Singletons:")
@@ -183,14 +194,14 @@ module SparseTransforms
 
                 println("Multitons : $multitons")
             end
-            
+
             # WARNING: this is not a correct thing to do
             # in the last iteration of peeling, everything will be singletons and there
             # will be no multitons
             if length(multitons) == 0 # no more multitons, and can construct final transform
                 multitons_found = false
             end
-                
+
             # balls to peel
             balls_to_peel = Set()
             ball_values = Dict()
@@ -201,7 +212,7 @@ module SparseTransforms
                 ball_values[ball] = rho
                 ball_sgn[ball] = sgn
             end
-                
+
             if verbose
                 println("Balls to be peeled")
                 println(balls_to_peel)
@@ -214,10 +225,10 @@ module SparseTransforms
 
                 push!(locs, k)
                 push!(strengths, ball_sgn[ball]*ball_values[ball])
-                
+
                 for (l, M) in enumerate(Ms)
                     peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
-                    signature_in_stage = Ss[l][:,ball+1]
+                    signature_in_stage = (-1) .^ (D * k)
                     to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
                     U = Us[l]
                     U_slice = U[peel, :]
@@ -228,22 +239,17 @@ module SparseTransforms
                 end # for peel
             end # for ball
         end # while
-            
+
         loc = Set()
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if wht[idx+1] == 0
-                wht[idx+1] = value
-            else
-                # todo robustify
-                wht[idx+1] = (wht[idx+1] + value) / 2 
-                # average out noise; e.g. in the example in 3.2, U1[11] and U2[11] are the same singleton,
-                # so averaging them reduces the effect of noise.
+            if !haskey(wht, idx+1)
+                wht[idx] = value
             end
         end
-        
-        wht /= 2 ^ (signal.n - b)
+
+        wht = Dict(i => x / (2 ^ (signal.n - b)) for (i,x) in wht)
         if report
             return wht, len(used), loc
         else

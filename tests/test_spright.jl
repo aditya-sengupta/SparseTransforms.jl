@@ -25,6 +25,9 @@ function test_spright()
     spright_wht = spright(signal, methods; verbose=true)
 
     println("Checking transform result...")
-    @test all(spright_wht .≈ signal.signal_w)
+    @test length(signal.loc) == length(spright_wht)
+    for (i, x) in spright_wht
+        @test signal.signal_w[i+1] ≈ x
+    end
     println("Transform is correct!")
 end
