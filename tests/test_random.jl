@@ -1,5 +1,6 @@
 using SparseTransforms
 using StatsBase, Random, Distributions
+using Test
 
 Random.seed!(1234)
 
