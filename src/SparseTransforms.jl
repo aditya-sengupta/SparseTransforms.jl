@@ -91,7 +91,7 @@ module SparseTransforms
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
 
-        Us, Ss = [], []
+        Us = []
         if report
             used = Set()
         end
@@ -101,21 +101,17 @@ module SparseTransforms
         else
             num_delays = signal.n * Int64(log2(signal.n)) # idk
         end
+        D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
             K = binary_ints(signal.n)
+            S = (-1) .^(D * K)
         end
-        D = get_D(signal.n; method=delays_method, num_delays=num_delays)
 
-        # subsample, make the observation [U] and offset signature [S] matrices
+        # subsample, make the observation [U] matrices
         for M in Ms
             U, used_i = compute_delayed_transform(signal, M, D, transform)
             U = hcat(U...)
             push!(Us, U)
-            S = 0
-            if reconstruct_method == :mle
-                S = (-1) .^(D * K)
-            end
-            push!(Ss, S)
             if report
                 used = union(used, used_i)
             end
@@ -137,7 +133,7 @@ module SparseTransforms
         # example: ball j goes to bin at "select_froms[i][j]"" in stage i
 
         # begin peeling
-        # index convention for peeling: 'i' goes over all M/U/S values
+        # index convention for peeling: 'i' goes over all M/U values
         # i.e. it refers to the index of the subsampling group (zero-indexed - off by one from the paper).
         # 'j' goes over all columns of the WHT subsample matrix, going from 0 to 2 ** b - 1.
         # e.g. (i, j) = (0, 2) refers to subsampling group 0, and aliased bin 2 (10 in binary)
@@ -157,7 +153,7 @@ module SparseTransforms
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
 
-            for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
+            for (i, (U, select_from)) in enumerate(zip(Us, select_froms))
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
@@ -183,7 +179,7 @@ module SparseTransforms
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
-            end # for U, S, select_from
+            end # for U, select_from
 
             # all singletons and multitons are discovered
             if verbose
