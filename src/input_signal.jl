@@ -17,7 +17,7 @@ struct TestSignal <: Signal
         noise = rand(Normal(0.0, noise_sd), N)
         wht = zeros(N)
         for (l, s) in zip(loc, strengths)
-            wht[l + 1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
+            wht[l] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
         end
         signal_t = fwht(wht) + noise
         new(n, loc, strengths, signal_t, noise_sd)

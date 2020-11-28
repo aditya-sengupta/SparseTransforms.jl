@@ -242,7 +242,7 @@ module SparseTransforms
             idx = k
             push!(loc, idx)
             if !haskey(wht, idx+1)
-                wht[idx] = value
+                wht[idx+1] = value
             end
         end
 

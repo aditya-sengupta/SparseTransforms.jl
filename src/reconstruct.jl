@@ -99,8 +99,7 @@ function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
         K = binary_ints(signal.n)
         S = (-1).^ (D * K)
     end
-    col_generator = @pipe U |> eachrow |> enumerate
-    for (i, col) in col_generator
+    for (i, col) in U |> eachrow |> enumerate
         sgn = 1
         if verbose
             println("Column:   ", col)

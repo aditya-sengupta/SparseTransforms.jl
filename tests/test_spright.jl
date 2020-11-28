@@ -9,7 +9,7 @@ function test_spright()
     @test signal.n == n
     wht = fwht(signal.signal_t)
     for (l, s) in zip(signal.loc, signal.strengths)
-        @test wht[l + 1] == s * 2^(signal.n)
+        @test wht[l] == s * 2^(signal.n)
     end
 
     println("Testing query methods...")
