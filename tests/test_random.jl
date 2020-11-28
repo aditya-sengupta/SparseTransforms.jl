@@ -8,7 +8,7 @@ function test_random()
     n = 4
     b = 2
     locs = sample(1:2^n, 2^b, replace=false)
-    strengths = Float64.(rand(1:10, 2^b)) .* (-1) .^ rand(Bool, 2^b)
+    strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
     signal = TestSignal(n, locs, strengths)
 
     println("True locations: ", locs)
