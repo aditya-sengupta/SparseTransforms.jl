@@ -20,7 +20,6 @@ function test_reconstruct()
 
     for M in Ms
         U, used_i = compute_delayed_subtransform(signal, M, D, fwht)
-        U = hcat(U...)
         push!(Us, U)
         push!(Ss, (-1) .^(D * K))
     end

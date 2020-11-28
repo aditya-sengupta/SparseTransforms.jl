@@ -9,9 +9,8 @@ struct TestSignal <: Signal
     n::Int64
     loc::Array{Int64,1}
     strengths::Array{Float64,1}
-    noise_sd::Float64
-    signal_w::Array{Float64,1}
     signal_t::Array{Float64,1}
+    noise_sd::Float64
 
     function TestSignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
         N = 2^n
@@ -21,8 +20,7 @@ struct TestSignal <: Signal
             wht[l + 1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
         end
         signal_t = fwht(wht) + noise
-        signal_w = fwht(signal_t) / N
-        new(n, loc, strengths, noise_sd, signal_w, signal_t)
+        new(n, loc, strengths, signal_t, noise_sd)
     end
 end
 

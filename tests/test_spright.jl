@@ -7,8 +7,9 @@ function test_spright()
     signal = TestSignal(4, [4, 6, 10, 15])
     signal = TestSignal(4, [4, 6, 10, 15], Float64.([2, 4, 1, 1]))
     @test signal.n == n
+    wht = fwht(signal.signal_t)
     for (l, s) in zip(signal.loc, signal.strengths)
-        @test signal.signal_w[l + 1] == s
+        @test wht[l + 1] == s * 2^(signal.n)
     end
 
     println("Testing query methods...")
@@ -26,8 +27,8 @@ function test_spright()
 
     println("Checking transform result...")
     @test length(signal.loc) == length(spright_wht)
-    for (i, x) in spright_wht
-        @test signal.signal_w[i+1] ≈ x
+    for (l, s) in zip(signal.loc, signal.strengths)
+        @test spright_wht[l] ≈ s
     end
     println("Transform is correct!")
 end
