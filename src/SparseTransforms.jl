@@ -124,9 +124,9 @@ module SparseTransforms
 
         # begin peeling
         # index convention for peeling: 'i' goes over all M/U values
-        # i.e. it refers to the index of the subsampling group (zero-indexed - off by one from the paper).
+        # i.e. it refers to the index of the subsampling group.
         # 'j' goes over all columns of the WHT subsample matrix, going from 0 to 2 ** b - 1.
-        # e.g. (i, j) = (0, 2) refers to subsampling group 0, and aliased bin 2 (10 in binary)
+        # e.g. (i, j) = (1, 2) refers to subsampling group 1, and aliased bin 2 (10 in binary)
         # which in the example of section 3.2 is the multiton X[0110] + X[1010] + W1[10]
 
         # a multiton will just store the (i, j)s in a list
@@ -170,13 +170,13 @@ module SparseTransforms
                         s_k = (-1) .^ (D * k)
                         ρ = (s_k ⋅ col) * sgn / length(col)
                         residual = col - sgn * ρ * s_k
-                        if residual ⋅ residual > cutoff
+                        if residual ⋅ residual > cutoff #&& !([i,j] in multitons)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[[i, j]] = (k, ρ, sgn)
+                            singletons[[i, j]] = (k, ρ * sgn)
                             active_modes = union(active_modes, bin_to_dec(k))
                         end # if residual norm > cutoff
-                    end # if col norm > cutoff
+                    end # if col norm > cutoff: note potential zeroton detection here
                 end # for col
 
                 # all singletons and multitons are discovered with the information thus far
@@ -197,14 +197,14 @@ module SparseTransforms
                 # balls to peel
                 balls_to_peel = Set()
                 ball_values = Dict()
-                for (_, (k, rho, sgn)) in singletons
+                for (_, (k, ρ)) in singletons
                     k_dec = bin_to_dec(k)
                     if !(k_dec in locs)
                         ball = k_dec
                         push!(balls_to_peel, ball)
-                        ball_values[ball] = rho * sgn
+                        ball_values[ball] = ρ
                         push!(locs, k_dec)
-                        push!(strengths, rho * sgn / 2^(signal.n - b))
+                        push!(strengths, ρ / 2^(signal.n - b))
                     end
                 end
 
