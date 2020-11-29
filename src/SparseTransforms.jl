@@ -9,7 +9,7 @@ module SparseTransforms
     export all_methods, spright, ffast, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
-    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
     export Signal, TestSignal, InputSignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_transform
     export singleton_detection, bin_cardinality
@@ -99,7 +99,7 @@ module SparseTransforms
         if delays_method != :nso
             num_delays = signal.n + 1
         else
-            num_delays = signal.n * Int64(log2(signal.n)) # idk
+            num_delays = 2 * signal.n * Int64(log2(signal.n)) # idk
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -153,7 +153,7 @@ module SparseTransforms
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
 
-            for (i, (U, select_from)) in enumerate(zip(Us, select_froms))
+            for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
@@ -172,10 +172,10 @@ module SparseTransforms
                         s_k = (-1) .^ (D * k)
                         ρ = (s_k ⋅ col) * sgn / length(col)
                         residual = col - sgn * ρ * s_k
-                        if residual ⋅ residual > cutoff
+                        if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[[i, j]] = (k, ρ, sgn)
+                            singletons[(i, j)] = (k, ρ, sgn)
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
