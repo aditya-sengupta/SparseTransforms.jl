@@ -4,7 +4,7 @@ using Test
 
 function test_random()
     Random.seed!(1234)
-    n = 4
+    n = 16
     b = 2
     σ = 1e-2
     locs = sample(1:2^n, 2^b, replace=false)
@@ -14,7 +14,8 @@ function test_random()
     println("True locations: ", locs)
     println("True strengths: ", strengths)
 
-    Ms = get_Ms(n, b; method=:simple)
+    other_b = get_b(signal; method=:simple)
+    Ms = get_Ms(n, other_b; method=:simple)
     for loc in locs
         println(loc)
         for (i, M) in enumerate(Ms)

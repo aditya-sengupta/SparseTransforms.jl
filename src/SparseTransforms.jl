@@ -99,7 +99,7 @@ module SparseTransforms
         if delays_method != :nso
             num_delays = signal.n + 1
         else
-            num_delays = 2 * signal.n * Int64(log2(signal.n)) # idk
+            num_delays = signal.n * Int64(log2(signal.n)) # idk
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -117,7 +117,7 @@ module SparseTransforms
             end
         end
 
-        cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
+        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
