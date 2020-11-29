@@ -17,7 +17,7 @@ function fwht(x::Array{Float64,1})
 end
 
 """
-Takes in a binary array and returns the corresponding integer. 
+Takes in a binary array and returns the corresponding integer.
 """
 function bin_to_dec(x::AbstractArray{Bool})
     return 2 .^(length(x)-1 : -1 : 0) ⋅ x
@@ -32,7 +32,7 @@ function dec_to_bin(x::Int64, num_bits::Int64)
 end
 
 """
-Returns a matrix where row 'i' is dec_to_bin(i, m), 
+Returns a matrix where row 'i' is dec_to_bin(i, m),
 for i from 0 to 2 ** m - 1.
 """
 function binary_ints(m::Int64)
@@ -45,4 +45,8 @@ returns 0 for positive reals and 1 for negative reals.
 """
 function sign_spright(x)
     return Int64(x < 0)
+end
+
+function expected_bin(k::BitArray{1}, M::BitArray{2})
+    return @pipe M'k |> Bool.(_) |> bin_to_dec(_) + 1
 end

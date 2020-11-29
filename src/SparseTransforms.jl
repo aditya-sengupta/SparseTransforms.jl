@@ -9,7 +9,7 @@ module SparseTransforms
     export all_methods, spright, ffast, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
-    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright
+    export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
     export Signal, TestSignal, InputSignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
@@ -107,7 +107,21 @@ module SparseTransforms
             S = (-1) .^(D * K)
         end
 
+<<<<<<< HEAD
         cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
+=======
+        # subsample, make the observation [U] matrices
+        for M in Ms
+            U, used_i = compute_delayed_transform(signal, M, D, transform)
+            U = hcat(U...)
+            push!(Us, U)
+            if report
+                used = union(used, used_i)
+            end
+        end
+
+        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
+>>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
@@ -142,6 +156,7 @@ module SparseTransforms
         Us = Any[]
         while (length(active_modes) < 2^b) && (num_peeling < peeling_max) && (iters < max_iters)
             # first step: find all the singletons and multitons.
+<<<<<<< HEAD
             for (i, (M, select_from)) in enumerate(zip(Ms, select_froms))
                 if length(Us) < i
                     U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
@@ -152,6 +167,12 @@ module SparseTransforms
                 else
                     U = Us[i]
                 end
+=======
+            singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
+            multitons = [] # list of (i, j) values indicating where multitons are.
+
+            for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
+>>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
@@ -170,11 +191,18 @@ module SparseTransforms
                         s_k = (-1) .^ (D * k)
                         ρ = (s_k ⋅ col) * sgn / length(col)
                         residual = col - sgn * ρ * s_k
+<<<<<<< HEAD
                         if residual ⋅ residual > cutoff #&& !([i,j] in multitons)
                             push!(multitons, [i, j])
                         else # declare as singleton
                             singletons[[i, j]] = (k, ρ * sgn)
                             active_modes = union(active_modes, bin_to_dec(k))
+=======
+                        if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
+                            push!(multitons, [i, j])
+                        else # declare as singleton
+                            singletons[(i, j)] = (k, ρ, sgn)
+>>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
                         end # if residual norm > cutoff
                     end # if col norm > cutoff: note potential zeroton detection here
                 end # for col
