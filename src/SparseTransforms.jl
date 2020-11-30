@@ -251,37 +251,4 @@ module SparseTransforms
             return wht
         end
     end
-
-    """
-    Tests a method on a signal and reports its average execution time and sample efficiency.
-    """
-    function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
-        time_start = time()
-        num_samples = 0
-        num_successes = 0
-        for i in ProgressBar(num_runs)
-            wht, samples = spright(signal, methods; report=True)
-            success = length(signal.loc) == length(spright_wht)
-            for (l, s) in zip(signal.loc, signal.strengths)
-                success = success & isapprox(wht[l], s, atol=5*signal.σ)
-            end
-            if success
-                num_successes += 1
-            end
-            num_samples += samples
-        end
-        return (time() - time_start) / num_runs, num_successes / num_runs, num_samples / (num_runs * 2 ^ signal.n)
-    end
-
-    """
-    Reports the results of a method_test.
-    """
-    function method_report(signal::TestSignal, num_runs::Int64=10)
-        println("Testing SPRIGHT with query method $query_method, delays method $delays_method, reconstruct method $reconstruct_method.")
-        t, s, sam = method_test(signal, num_runs)
-        print("Average time in seconds: ", format(t))
-        print("Success ratio: ", s)
-        print("Average sample ratio: ", sam)
-    end
-
 end # module

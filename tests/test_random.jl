@@ -5,7 +5,7 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 4
+    n = 8
     b = 2
     σ = 1e-2
     locs = sample(0:2^n-1, 2^b, replace=false)
@@ -21,8 +21,8 @@ function test_random()
     for loc in locs
         println(loc)
         for (i, M) in enumerate(Ms)
-            exp = expected_bin(dec_to_bin(loc, n), M)
-            println("\t$i: $exp")
+            expected = expected_bin(dec_to_bin(loc, n), M)
+            println("\t$i: $expected")
         end
         println()
     end
