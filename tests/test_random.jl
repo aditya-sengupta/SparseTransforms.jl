@@ -5,18 +5,18 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 4
-    b = 2
+    n = 16
+    k = 2
     σ = 1e-2
-    locs = sample(1:2^n, 2^b, replace=false)
-    strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
+    locs = sample(0:2^n-1, 2^k, replace=false)
+    strengths = Float64.(rand(Uniform(0.1, 10), 2^k)) .* (-1) .^ rand(Bool, 2^k)
     signal = TestSignal(n, locs, strengths, σ)
 
     println("True locations: ", locs)
     println("True strengths: ", strengths)
 
-    other_b = get_b(signal; method=:simple)
-    Ms = get_Ms(n, other_b; method=:simple)
+    b = get_b(signal; method=:simple)
+    Ms = get_Ms(n, b; method=:simple)
     for loc in locs
         println(loc)
         for (i, M) in enumerate(Ms)

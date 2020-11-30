@@ -239,7 +239,7 @@ module SparseTransforms
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if !haskey(wht, idx+1)
+            if !haskey(wht, idx)
                 wht[idx] = value
             end
         end
