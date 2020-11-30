@@ -41,10 +41,30 @@ function singleton_detection_nso(U_slice; kwargs...)
     return est, 1
 end
 
+"""
+Robust sign estimation for sample-optimal singleton detection.
+"""
+function estimate_sign(U_slice)
+    return 1
+end
+
+"""
+Sample-optimal singleton detection.
+"""
+function singleton_detection_so(U_slice; kwargs...)
+    n = kwargs[:n]
+    p1, p2, p3 = kwargs[:num_delays]
+    code = kwargs[:code]
+    sgn = estimate_sign(U_slice[:, p1+1:p1+p2])
+    k = decode_with(U_slice[:, p1+p2+1:p1+p2+p3], sgn, code)
+    return k, sgn
+end
+
 singleton_detection_lookup = Dict(
     :mle => singleton_detection_mle,
     :noiseless => singleton_detection_noiseless,
-    :nso => singleton_detection_nso
+    :nso => singleton_detection_nso,
+    :so => singleton_detection_so
 )
 
 """

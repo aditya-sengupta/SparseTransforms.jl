@@ -108,10 +108,28 @@ function get_D_nso(n::Int64; kwargs...)::BitArray{2}
     return D
 end
 
+function get_generator_matrix(codelen::Int64, n::Int64, code::Symbol)
+    return zeros((codelen, n))
+end
+
+"""
+Get a channel code based (SO-SPRIGHT) delays matrix. See get_D for full signature.
+Returns a matrix of dimension (p1+p2+p3, n).
+"""
+function get_D_so(n::Int64; kwargs...)::BitArray{2}
+    p1, p2, p3 = kwargs[:num_delays]
+    code = kwargs[:code]
+    D1 = get_D_random(n, num_delays=p1)
+    D2 = zeros((p2, n))
+    D3 = get_generator_matrix(p3, n, code)
+    return vcat(D1, D2, D3)
+end
+
 get_D_lookup = Dict(
     :identity_like => get_D_identity_like,
     :random => get_D_random,
-    :nso => get_D_nso
+    :nso => get_D_nso,
+    :so => get_D_so
 )
 
 """

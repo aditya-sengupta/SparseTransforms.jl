@@ -96,10 +96,15 @@ module SparseTransforms
             used = Set()
         end
 
-        if delays_method != :nso
-            num_delays = signal.n + 1
-        else
+        if delays_method == :nso
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
+        elseif delays_method == :so
+            linearrithmic = signal.n * Int64(ceil(log2(signal.n)))
+            num_delays = [linearrithmic,    # P1
+                          signal.n,         # P2
+                          linearrithmic]    # P3
+        else
+            num_delays = signal.n + 1
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
