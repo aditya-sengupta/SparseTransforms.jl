@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal
+    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -99,7 +99,7 @@ module SparseTransforms
         if delays_method != :nso
             num_delays = signal.n + 1
         else
-            num_delays = signal.n * Int64(log2(signal.n)) # idk
+            num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -107,13 +107,9 @@ module SparseTransforms
             S = (-1) .^(D * K)
         end
 
-<<<<<<< HEAD
-        cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
-=======
         # subsample, make the observation [U] matrices
         for M in Ms
-            U, used_i = compute_delayed_transform(signal, M, D, transform)
-            U = hcat(U...)
+            U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
             push!(Us, U)
             if report
                 used = union(used, used_i)
@@ -121,7 +117,6 @@ module SparseTransforms
         end
 
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
->>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
@@ -156,23 +151,10 @@ module SparseTransforms
         Us = Any[]
         while (length(active_modes) < 2^b) && (num_peeling < peeling_max) && (iters < max_iters)
             # first step: find all the singletons and multitons.
-<<<<<<< HEAD
-            for (i, (M, select_from)) in enumerate(zip(Ms, select_froms))
-                if length(Us) < i
-                    U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
-                    push!(Us, U)
-                    if report
-                        used = union(used, used_i)
-                    end
-                else
-                    U = Us[i]
-                end
-=======
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
 
             for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
->>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
@@ -188,21 +170,14 @@ module SparseTransforms
                             S_slice=slice,
                             n=signal.n
                         ) # find the best fit singleton
+                        println("singleton found")
                         s_k = (-1) .^ (D * k)
                         ρ = (s_k ⋅ col) * sgn / length(col)
                         residual = col - sgn * ρ * s_k
-<<<<<<< HEAD
-                        if residual ⋅ residual > cutoff #&& !([i,j] in multitons)
-                            push!(multitons, [i, j])
-                        else # declare as singleton
-                            singletons[[i, j]] = (k, ρ * sgn)
-                            active_modes = union(active_modes, bin_to_dec(k))
-=======
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, ρ, sgn)
->>>>>>> 902cf986dae27c3786e7058cd42477592fae94de
+                            singletons[(i, j)] = (k, ρ * sgn)
                         end # if residual norm > cutoff
                     end # if col norm > cutoff: note potential zeroton detection here
                 end # for col
@@ -266,17 +241,17 @@ module SparseTransforms
         end # while
 
         loc = Set()
+        norm = sqrt(2 ^ signal.n)
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = k
             push!(loc, idx)
             if !haskey(wht, idx+1)
-                wht[idx+1] = value
+                wht[idx] = value * sqrt(2 ^ (signal.n - b))
             end
         end
 
-        # wht = Dict(i => x / (2 ^ (signal.n - b)) for (i,x) in wht)
         if report
-            return wht, len(used), loc
+            return wht, length(used)
         else
             return wht
         end
@@ -287,16 +262,20 @@ module SparseTransforms
     """
     function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
         time_start = time()
-        samples = 0
-        successes = 0
+        num_samples = 0
+        num_successes = 0
         for i in ProgressBar(num_runs)
-            wht, num_samples, loc = spright(signal, methods; report=True)
-            if loc == set(signal.loc)
-                successes += 1
+            wht, samples = spright(signal, methods; report=True)
+            success = length(signal.loc) == length(spright_wht)
+            for (l, s) in zip(signal.loc, signal.strengths)
+                success = success & isapprox(wht[l], s, atol=5*signal.σ)
             end
-            samples += num_samples
+            if success
+                num_successes += 1
+            end
+            num_samples += samples
         end
-        return (time() - time_start) / num_runs, successes / num_runs, samples / (num_runs * 2 ^ signal.n)
+        return (time() - time_start) / num_runs, num_successes / num_runs, num_samples / (num_runs * 2 ^ signal.n)
     end
 
     """

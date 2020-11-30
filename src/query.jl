@@ -17,7 +17,11 @@ A semi-arbitrary fixed choice of the sparsity coefficient.
 See get_b for full signature.
 """
 function get_b_simple(signal::Signal)
-    return signal.n ÷ 2
+    if signal.n == 4
+        return 2
+    elseif (signal.n == 8) || (signal.n == 16)
+        return 4
+    end
 end
 
 get_b_lookup = Dict(
@@ -49,7 +53,7 @@ A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full s
 """
 function get_Ms_simple(n::Int64, b::Int64)
 
-    @assert n % b == 0 "b must be exactly divisible by n"
+    @assert n % b == 0 "n must be exactly divisible by b"
     num_to_get = n ÷ b
 
     Ms = Any[]
@@ -176,9 +180,9 @@ function compute_delayed_fft(signal::Signal, M, D)
     return compute_delayed_subtransform(signal, M, D, fft)
 end
 
-function compute_delayed_subtransform(signal::Signal, M, D, subtransform::Function)
+function compute_delayed_subtransform(signal::Signal, M, D, transform::Function)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
-    samples_to_transform = map(x -> signal.signal_t[x], inds)
-    return hcat(subtransform.(samples_to_transform)...), used_inds
+    samples_to_transform = map(x -> get_subsignal(signal, x), inds)
+    return hcat(transform.(samples_to_transform)...), used_inds
 end

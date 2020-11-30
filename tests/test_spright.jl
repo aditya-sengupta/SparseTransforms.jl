@@ -7,10 +7,6 @@ function test_spright()
     signal = TestSignal(4, [4, 6, 10, 15])
     signal = TestSignal(4, [4, 6, 10, 15], Float64.([2, 4, 1, 1]))
     @test signal.n == n
-    wht = fwht(signal.signal_t)
-    for (l, s) in zip(signal.loc, signal.strengths)
-        @test wht[l] == s * 2^(signal.n)
-    end
 
     println("Testing query methods...")
     b = get_b(signal)
@@ -23,12 +19,14 @@ function test_spright()
 
     println("Testing full transform...")
     methods = [:simple, :nso, :nso]
-    spright_wht = spright(signal, methods; verbose=true)
+    spright_wht, utilization = spright(signal, methods; verbose=true, report=true)
+    println("Used $(utilization / 2^n) of all time samples")
 
     println("Checking transform result...")
+    true_wht = Dict(l => s for (l, s) in zip(signal.loc, signal.strengths))
     @test length(signal.loc) == length(spright_wht)
-    for (l, s) in zip(signal.loc, signal.strengths)
-        @test spright_wht[l] ≈ s
+    for (i, x) in spright_wht
+        @test true_wht[i] ≈ x
     end
     println("Transform is correct!")
 end
