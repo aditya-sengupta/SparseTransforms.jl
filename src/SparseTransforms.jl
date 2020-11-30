@@ -241,11 +241,10 @@ module SparseTransforms
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
             if !haskey(wht, idx+1)
-                wht[idx] = value / norm
+                wht[idx] = value * sqrt(2 ^ (signal.n - b))
             end
         end
 
-        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
         if report
             return wht, length(used)
         else

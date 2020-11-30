@@ -45,7 +45,7 @@ function get_subsignal(signal::Signal, ind::Int64)
     if isa(signal.signal_t, Array) || haskey(signal.signal_t, ind)
         return signal.signal_t[ind]
     else
-        m = dec_to_bin(ind, signal.n)
+        m = dec_to_bin(ind-1, signal.n)
         sgns = (-1) .^ [m ⋅ dec_to_bin(l, signal.n) for l in signal.loc]
         val = (1 / sqrt(2 ^ signal.n)) * (signal.strengths ⋅ sgns) + rand(Normal(0.0, signal.noise_sd))
         signal.signal_t[ind] = val
