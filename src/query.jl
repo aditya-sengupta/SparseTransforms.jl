@@ -21,6 +21,8 @@ function get_b_simple(signal::Signal)
         return 2
     elseif (signal.n == 8) || (signal.n == 16)
         return 4
+    else
+        return signal.n ÷ 2
     end
 end
 
@@ -45,6 +47,9 @@ b : Int64
 The sparsity coefficient.
 """
 function get_b(signal::Signal; method=:simple)::Int64
+    if hasproperty(signal, :b)
+        return signal.b
+    end
     return get_b_lookup[method](signal)
 end
 
@@ -183,6 +188,6 @@ end
 function compute_delayed_subtransform(signal::Signal, M, D, transform::Function)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
-    samples_to_transform = map(x -> signal.signal_t[x], inds)
+    samples_to_transform = map(x -> get_subsignal(signal, x), inds)
     return hcat(transform.(samples_to_transform)...), used_inds
 end

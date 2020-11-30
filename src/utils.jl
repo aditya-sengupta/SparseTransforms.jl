@@ -6,6 +6,10 @@ using Pipe.Pipe
 Cooley-Tukey recursive Fast Walsh-Hadamard Transform.
 """
 function fwht(x::Array{Float64,1})
+    return fwht_helper(x) / sqrt(length(x))
+end
+
+function fwht_helper(x::Array{Float64,1})
     N = length(x)
     if N == 1
         return x

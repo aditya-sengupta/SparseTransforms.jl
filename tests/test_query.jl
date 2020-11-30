@@ -9,6 +9,14 @@ function test_query()
 
     # this also implicitly does type checks
 
+    println("Testing index retrieval")
+    for i = 1:2^n
+        @test get_subsignal(signal, i) == signal.signal_t[i]
+    end
+
+    subsample_check = collect(1:n:2^n)
+    @test get_subsignal(signal, subsample_check) == map(i -> signal.signal_t[i], subsample_check)
+
     println("Testing all the query methods")
     for method_name in all_methods["query"]
         local b = get_b(signal; method=method_name)

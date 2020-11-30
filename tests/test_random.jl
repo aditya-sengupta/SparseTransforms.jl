@@ -5,10 +5,10 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 4
-    b = 2
+    n = 25
+    b = 5
     σ = 1e-2
-    locs = sample(1:2^n, 2^b, replace=false)
+    locs = sample(0:2^n-1, 2^b, replace=false)
     strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
     signal = TestSignal(n, locs, strengths, σ)
 
@@ -16,7 +16,7 @@ function test_random()
     println("True strengths: ", strengths)
 
     other_b = get_b(signal; method=:simple)
-    Ms = get_Ms(n, other_b; method=:simple)
+    Ms = get_Ms(n, b; method=:simple)
     for loc in locs
         println(loc)
         for (i, M) in enumerate(Ms)
