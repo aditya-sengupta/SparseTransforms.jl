@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal
+    export Signal, TestSignal, InputSignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -60,7 +60,7 @@ module SparseTransforms
             :mle : naive noisy decoding; decode by taking the maximum-likelihood singleton that could be at that bin.
             :nso : reconstruct according to the NSO-SPRIGHT algorithm.
 
-    subtransform : Function
+    transform : Function
     The base transform: either `fwht` or `fft`.
 
     verbose : Bool
@@ -74,7 +74,7 @@ module SparseTransforms
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::Signal, methods::Array{Symbol,1}, subtransform::Function; verbose::Bool=false, report::Bool=false)
+    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
         for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
@@ -109,7 +109,7 @@ module SparseTransforms
 
         # subsample, make the observation [U] matrices
         for M in Ms
-            U, used_i = compute_delayed_subtransform(signal, M, D, subtransform)
+            U, used_i = compute_delayed_subtransform(signal, M, D, transform)
             push!(Us, U)
             if report
                 used = union(used, used_i)
@@ -133,9 +133,9 @@ module SparseTransforms
 
         # begin peeling
         # index convention for peeling: 'i' goes over all M/U values
-        # i.e. it refers to the index of the subsampling group.
+        # i.e. it refers to the index of the subsampling group (zero-indexed - off by one from the paper).
         # 'j' goes over all columns of the WHT subsample matrix, going from 0 to 2 ** b - 1.
-        # e.g. (i, j) = (1, 2) refers to subsampling group 1, and aliased bin 2 (10 in binary)
+        # e.g. (i, j) = (0, 2) refers to subsampling group 0, and aliased bin 2 (10 in binary)
         # which in the example of section 3.2 is the multiton X[0110] + X[1010] + W1[10]
 
         # a multiton will just store the (i, j)s in a list
@@ -143,13 +143,11 @@ module SparseTransforms
         # e.g. the singleton (0, 0), which in the example of section 3.2 is X[0100] + W1[00]
         # would be stored as the dictionary entry (0, 0): array([0, 1, 0, 0]).
 
-        singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
-        multitons = [] # list of (i, j) values indicating where multitons are.
+        multitons_found = true
         iters = 0
         max_iters = 2 ^ (b + 1)
-        active_modes = Set{Int64}()
-        Us = Any[]
-        while (length(active_modes) < 2^b) && (num_peeling < peeling_max) && (iters < max_iters)
+        while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
+
             # first step: find all the singletons and multitons.
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = [] # list of (i, j) values indicating where multitons are.
@@ -170,80 +168,77 @@ module SparseTransforms
                             S_slice=slice,
                             n=signal.n
                         ) # find the best fit singleton
-                        println("singleton found")
                         s_k = (-1) .^ (D * k)
                         ρ = (s_k ⋅ col) * sgn / length(col)
                         residual = col - sgn * ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, ρ * sgn)
+                            singletons[(i, j)] = (k, ρ, sgn)
                         end # if residual norm > cutoff
-                    end # if col norm > cutoff: note potential zeroton detection here
+                    end # if col norm > cutoff
                 end # for col
-
-                # all singletons and multitons are discovered with the information thus far
-                if verbose
-                    println("All active modes:")
-                    println(active_modes)
-                    println("Singletons:")
-                    for (ston_key, ston_value) in singletons
-                        println(ston_key, bin_to_dec(ston_value[1]))
-                    end
-
-                    println("Multitons : $multitons")
-                end
-
-                # in the last iteration of peeling, everything will be singletons and there
-                # will be no multitons
-
-                # balls to peel
-                balls_to_peel = Set()
-                ball_values = Dict()
-                for (_, (k, ρ)) in singletons
-                    k_dec = bin_to_dec(k)
-                    if !(k_dec in locs)
-                        ball = k_dec
-                        push!(balls_to_peel, ball)
-                        ball_values[ball] = ρ
-                        push!(locs, k_dec)
-                        push!(strengths, ρ / 2^(signal.n - b))
-                    end
-                end
-
-                if verbose
-                    println("Balls to be peeled")
-                    println(balls_to_peel)
-                end
-                # peel
-                iters += 1
-                for ball in balls_to_peel
-                    num_peeling += 1
-                    k = dec_to_bin(ball, signal.n)
-
-                    for (l, M) in enumerate(Ms[1:length(Us)])
-                        peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
-                        signature_in_stage = (-1) .^ (D * k)
-                        to_subtract = ball_values[ball] * signature_in_stage
-                        U = Us[l]
-                        U_slice = U[peel, :]
-                        Us[l][peel,:] = U_slice - to_subtract
-                        if verbose
-                            println("Peeled ball $(bin_to_dec(k)) off bin ($l, $peel)")
-                        end
-                    end # for peel
-                end # for ball
-                if verbose
-                    println("Peeling round ended: identified locs $locs and strengths $strengths")
-                    println()
-                end
             end # for U, select_from
+
+            # all singletons and multitons are discovered
+            if verbose
+                println("Singletons:")
+                for (ston_key, ston_value) in singletons
+                    println(ston_key, bin_to_dec(ston_value[1]))
+                end
+
+                println("Multitons : $multitons")
+            end
+
+            # WARNING: this is not a correct thing to do
+            # in the last iteration of peeling, everything will be singletons and there
+            # will be no multitons
+            if length(multitons) == 0 # no more multitons, and can construct final transform
+                multitons_found = false
+            end
+
+            # balls to peel
+            balls_to_peel = Set()
+            ball_values = Dict()
+            ball_sgn = Dict()
+            for (_, (k, rho, sgn)) in singletons
+                ball = bin_to_dec(k)
+                push!(balls_to_peel, ball)
+                ball_values[ball] = rho
+                ball_sgn[ball] = sgn
+            end
+
+            if verbose
+                println("Balls to be peeled")
+                println(balls_to_peel)
+            end
+            # peel
+            iters += 1
+            for ball in balls_to_peel
+                num_peeling += 1
+                k = dec_to_bin(ball, signal.n)
+
+                push!(locs, k)
+                push!(strengths, ball_sgn[ball]*ball_values[ball])
+
+                for (l, M) in enumerate(Ms)
+                    peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
+                    signature_in_stage = (-1) .^ (D * k)
+                    to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
+                    U = Us[l]
+                    U_slice = U[peel, :]
+                    Us[l][peel,:] = U_slice - to_subtract
+                    if verbose
+                        println("Peeled ball $(bin_to_dec(k)) off bin ($l, $peel)")
+                    end
+                end # for peel
+            end # for ball
         end # while
 
         loc = Set()
         norm = sqrt(2 ^ signal.n)
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
-            idx = k
+            idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
             if !haskey(wht, idx+1)
                 wht[idx] = value * sqrt(2 ^ (signal.n - b))
