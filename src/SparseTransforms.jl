@@ -11,7 +11,7 @@ module SparseTransforms
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
     export Signal, TestSignal, InputSignal
-    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_transform
+    export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
     all_methods = Dict(
@@ -99,7 +99,7 @@ module SparseTransforms
         if delays_method != :nso
             num_delays = signal.n + 1
         else
-            num_delays = signal.n * Int64(round(log2(signal.n))) # idk
+            num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -109,8 +109,7 @@ module SparseTransforms
 
         # subsample, make the observation [U] matrices
         for M in Ms
-            U, used_i = compute_delayed_transform(signal, M, D, transform)
-            U = hcat(U...)
+            U, used_i = compute_delayed_subtransform(signal, M, D, transform)
             push!(Us, U)
             if report
                 used = union(used, used_i)

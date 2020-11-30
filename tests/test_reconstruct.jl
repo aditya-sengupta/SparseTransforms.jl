@@ -19,8 +19,7 @@ function test_reconstruct()
     K = binary_ints(signal.n)
 
     for M in Ms
-        U, used_i = compute_delayed_transform(signal, M, D, fwht)
-        U = hcat(U...)
+        U, used_i = compute_delayed_subtransform(signal, M, D, fwht)
         push!(Us, U)
         push!(Ss, (-1) .^(D * K))
     end

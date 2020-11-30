@@ -15,7 +15,7 @@ function test_spright()
     b = get_b(signal)
     Ms = get_Ms(n, b)
     D = get_D(n)
-    whts_and_inds = map(M -> compute_delayed_transform(signal, M, D, fwht), Ms)
+    whts_and_inds = map(M -> compute_delayed_subtransform(signal, M, D, fwht), Ms)
 
     println("Testing reconstruction...")
     bin_cardinalities = map(M -> bin_cardinality(signal, M, D), Ms)
