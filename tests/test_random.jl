@@ -2,9 +2,10 @@ using SparseTransforms
 using StatsBase, Random, Distributions
 using Test
 
+Random.seed!(1234)
+
 function test_random()
-    Random.seed!(1234)
-    n = 16
+    n = 4
     b = 2
     σ = 1e-2
     locs = sample(1:2^n, 2^b, replace=false)
@@ -26,9 +27,10 @@ function test_random()
     end
 
     methods = [:simple, :nso, :nso]
-    spright_wht = spright(signal, methods; verbose=true)
+    spright_wht, used_size = spright(signal, methods; verbose=true, report=true)
 
     println("SPRIGHT result: ", spright_wht)
+    println("Used $(used_size / 2^n) of all time samples")
     @test length(signal.loc) == length(spright_wht)
     for (l, s) in zip(signal.loc, signal.strengths)
         @test isapprox(spright_wht[l], s, atol=5*σ)

@@ -17,7 +17,11 @@ A semi-arbitrary fixed choice of the sparsity coefficient.
 See get_b for full signature.
 """
 function get_b_simple(signal::Signal)
-    return signal.n ÷ 2
+    if signal.n == 4
+        return 2
+    elseif (signal.n == 8) || (signal.n == 16)
+        return 4
+    end
 end
 
 get_b_lookup = Dict(

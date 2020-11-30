@@ -99,7 +99,7 @@ module SparseTransforms
         if delays_method != :nso
             num_delays = signal.n + 1
         else
-            num_delays = signal.n * Int64(log2(signal.n)) # idk
+            num_delays = signal.n * Int64(round(log2(signal.n))) # idk
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -245,9 +245,9 @@ module SparseTransforms
             end
         end
 
-        wht = Dict(i => x / (2 ^ (signal.n - b)) for (i,x) in wht)
+        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
         if report
-            return wht, len(used), loc
+            return wht, length(used)
         else
             return wht
         end
@@ -258,16 +258,20 @@ module SparseTransforms
     """
     function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
         time_start = time()
-        samples = 0
-        successes = 0
+        num_samples = 0
+        num_successes = 0
         for i in ProgressBar(num_runs)
-            wht, num_samples, loc = spright(signal, methods; report=True)
-            if loc == set(signal.loc)
-                successes += 1
+            wht, samples = spright(signal, methods; report=True)
+            success = length(signal.loc) == length(spright_wht)
+            for (l, s) in zip(signal.loc, signal.strengths)
+                success = success & isapprox(wht[l], s, atol=5*signal.σ)
             end
-            samples += num_samples
+            if success
+                num_successes += 1
+            end
+            num_samples += samples
         end
-        return (time() - time_start) / num_runs, successes / num_runs, samples / (num_runs * 2 ^ signal.n)
+        return (time() - time_start) / num_runs, num_successes / num_runs, num_samples / (num_runs * 2 ^ signal.n)
     end
 
     """
