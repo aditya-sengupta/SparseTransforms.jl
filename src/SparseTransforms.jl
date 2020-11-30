@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal
+    export Signal, TestSignal, InputSignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -236,11 +236,12 @@ module SparseTransforms
         end # while
 
         loc = Set()
+        norm = sqrt(2 ^ signal.n)
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if !haskey(wht, idx)
-                wht[idx] = value
+            if !haskey(wht, idx+1)
+                wht[idx] = value / norm
             end
         end
 

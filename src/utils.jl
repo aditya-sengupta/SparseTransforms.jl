@@ -5,18 +5,19 @@ using Pipe.Pipe
 """
 Cooley-Tukey recursive Fast Walsh-Hadamard Transform.
 """
-function fwht(x::Array{Float64,1})
-    return fwht_helper(x) / sqrt(length(x))
-end
-
-function fwht_helper(x::Array{Float64,1})
+function fwht(x::Array{Float64,1}; recurses=false)
     N = length(x)
     if N == 1
         return x
     else
-        X_even = fwht(x[1 : N÷2])
-        X_odd = fwht(x[N÷2+1 : N])
-        return cat(X_even + X_odd, X_even - X_odd, dims=1)
+        X_even = fwht(x[1 : N÷2]; recurses=true)
+        X_odd = fwht(x[N÷2+1 : N]; recurses=true)
+        res = cat(X_even + X_odd, X_even - X_odd, dims=1)
+        if !recurses
+            return res / √N
+        else
+            return res
+        end 
     end
 end
 

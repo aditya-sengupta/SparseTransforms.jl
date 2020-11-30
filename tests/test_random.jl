@@ -5,8 +5,8 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 25
-    b = 5
+    n = 4
+    b = 2
     σ = 1e-2
     locs = sample(0:2^n-1, 2^b, replace=false)
     strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)

@@ -21,8 +21,6 @@ function get_b_simple(signal::Signal)
         return 2
     elseif (signal.n == 8) || (signal.n == 16)
         return 4
-    else
-        return signal.n ÷ 2
     end
 end
 
@@ -47,9 +45,6 @@ b : Int64
 The sparsity coefficient.
 """
 function get_b(signal::Signal; method=:simple)::Int64
-    if hasproperty(signal, :b)
-        return signal.b
-    end
     return get_b_lookup[method](signal)
 end
 

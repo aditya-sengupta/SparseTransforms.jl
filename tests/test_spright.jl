@@ -23,9 +23,10 @@ function test_spright()
     println("Used $(utilization / 2^n) of all time samples")
 
     println("Checking transform result...")
+    true_wht = Dict(l => s for (l, s) in zip(signal.loc, signal.strengths))
     @test length(signal.loc) == length(spright_wht)
     for (i, x) in spright_wht
-        @test signal.signal_w[i+1] ≈ x
+        @test true_wht[i] ≈ x
     end
     println("Transform is correct!")
 end
