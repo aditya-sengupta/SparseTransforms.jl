@@ -7,7 +7,7 @@ abstract type Signal end
 
 struct TestSignal <: Signal
     n::Int64
-    b::Int64
+    k::Int64
     loc::Array{Int64,1}
     strengths::Array{Float64,1}
     noise_sd::Float64
@@ -15,20 +15,20 @@ struct TestSignal <: Signal
 
     function TestSignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
         N = 2^n
-        b = loc |> length |> log2 |> ceil |> Int64
+        k = loc |> length |> log2 |> ceil |> Int64
         noise = rand(Normal(0.0, noise_sd), N)
         wht = zeros(N)
         for (l, s) in zip(loc, strengths)
             wht[l+1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
         end
         signal_t = fwht(wht) + noise
-        new(n, b, loc, strengths, noise_sd, signal_t)
+        new(n, k, loc, strengths, noise_sd, signal_t)
     end
 end
 
 struct LazySignal <: Signal
     n::Int64
-    b::Int64
+    k::Int64
     loc::Array{Int64,1}
     strengths::Array{Float64,1}
     noise_sd::Float64
@@ -36,8 +36,8 @@ struct LazySignal <: Signal
 
     function LazySignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
         N = 2^n
-        b = loc |> length |> log2 |> ceil |> Int64
-        new(n, b, loc, strengths, noise_sd, Dict())
+        k = loc |> length |> log2 |> ceil |> Int64
+        new(n, k, loc, strengths, noise_sd, Dict())
     end
 end
 
