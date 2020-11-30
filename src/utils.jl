@@ -17,7 +17,7 @@ function fwht(x::Array{Float64,1}; recurses=false)
             return res / √N
         else
             return res
-        end 
+        end
     end
 end
 

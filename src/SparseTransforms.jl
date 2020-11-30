@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal
+    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -90,6 +90,7 @@ module SparseTransforms
         b = get_b(signal; method=query_method)
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
+        N, B = 2^signal.n, 2^b
 
         Us = []
         if report
@@ -99,10 +100,10 @@ module SparseTransforms
         if delays_method == :nso
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         elseif delays_method == :so
-            linearrithmic = signal.n * Int64(ceil(log2(signal.n)))
+            num_delays = signal.n * Int64(ceil(log2(signal.n)))
             num_delays = [linearrithmic,    # P1
                           signal.n,         # P2
-                          linearrithmic]    # P3
+                          linearrithmic]    # P3 - TODO: fix for cutoff
         else
             num_delays = signal.n + 1
         end
@@ -115,11 +116,12 @@ module SparseTransforms
         # subsample, make the observation [U] matrices
         for M in Ms
             U, used_i = compute_delayed_subtransform(signal, M, D, transform)
-            push!(Us, U)
+            push!(Us, sqrt(N)*U)
             if report
                 used = union(used, used_i)
             end
         end
+        # U -> 1/√N ⋅ 1/√B ⋅ √N U_old = U_old / √B
 
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
 
@@ -241,7 +243,6 @@ module SparseTransforms
         end # while
 
         loc = Set()
-        norm = sqrt(2 ^ signal.n)
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)

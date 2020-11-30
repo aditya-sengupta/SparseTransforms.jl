@@ -20,7 +20,7 @@ function get_b_simple(signal::Signal)
     if signal.n == 4
         return 2
     elseif (signal.n == 8) || (signal.n == 16)
-        return 4
+        return 2
     end
 end
 
