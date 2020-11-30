@@ -4,7 +4,7 @@ using Test
 
 function test_random()
     Random.seed!(1234)
-    n = 16
+    n = 4
     b = 2
     σ = 1e-2
     locs = sample(1:2^n, 2^b, replace=false)
