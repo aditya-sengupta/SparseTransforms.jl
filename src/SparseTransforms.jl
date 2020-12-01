@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal
+    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -90,16 +90,22 @@ module SparseTransforms
         b = get_b(signal; method=query_method)
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
+        N, B = 2^signal.n, 2^b
 
         Us = []
         if report
             used = Set()
         end
 
-        if delays_method != :nso
-            num_delays = signal.n + 1
-        else
+        if delays_method == :nso
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
+        elseif delays_method == :so
+            num_delays = signal.n * Int64(ceil(log2(signal.n)))
+            num_delays = [linearrithmic,    # P1
+                          signal.n,         # P2
+                          linearrithmic]    # P3 - TODO: fix for cutoff
+        else
+            num_delays = signal.n + 1
         end
         D = get_D(signal.n; method=delays_method, num_delays=num_delays)
         if reconstruct_method == :mle
@@ -236,19 +242,52 @@ module SparseTransforms
         end # while
 
         loc = Set()
-        norm = sqrt(2 ^ signal.n)
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
-            if !haskey(wht, idx+1)
-                wht[idx] = value * sqrt(2 ^ (signal.n - b))
+            if !haskey(wht, idx)
+                wht[idx] = value
             end
         end
 
+        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
         if report
             return wht, length(used)
         else
             return wht
         end
     end
+
+    """
+    Tests a method on a signal and reports its average execution time and sample efficiency.
+    """
+    function method_test(signal::TestSignal, methods::Array{Symbol,1}; num_runs::Int64=10)
+        time_start = time()
+        num_samples = 0
+        num_successes = 0
+        for i in ProgressBar(num_runs)
+            wht, samples = spright(signal, methods; report=True)
+            success = length(signal.locs) == length(spright_wht)
+            for (l, s) in zip(signal.locs, signal.strengths)
+                success = success & isapprox(wht[l], s, atol=5*signal.σ)
+            end
+            if success
+                num_successes += 1
+            end
+            num_samples += samples
+        end
+        return (time() - time_start) / num_runs, num_successes / num_runs, num_samples / (num_runs * 2 ^ signal.n)
+    end
+
+    """
+    Reports the results of a method_test.
+    """
+    function method_report(signal::TestSignal, num_runs::Int64=10)
+        println("Testing SPRIGHT with query method $query_method, delays method $delays_method, reconstruct method $reconstruct_method.")
+        t, s, sam = method_test(signal, num_runs)
+        print("Average time in seconds: ", format(t))
+        print("Success ratio: ", s)
+        print("Average sample ratio: ", sam)
+    end
+
 end # module

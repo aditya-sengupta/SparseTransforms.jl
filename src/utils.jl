@@ -14,10 +14,10 @@ function fwht(x::Array{Float64,1}; recurses=false)
         X_odd = fwht(x[N÷2+1 : N]; recurses=true)
         res = cat(X_even + X_odd, X_even - X_odd, dims=1)
         if !recurses
-            return res / √N
+            return res #/ √N
         else
             return res
-        end 
+        end
     end
 end
 

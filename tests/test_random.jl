@@ -5,26 +5,33 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 8
-    b = 2
+    n = 32
+    k = 4
     σ = 1e-2
-    locs = sample(0:2^n-1, 2^b, replace=false)
-    strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
-    signal = TestSignal(n, locs, strengths, σ)
+    signal = get_random_sparse_signal(n, k, σ, 0.1, 10.0)
 
+    println("True locations: ", signal.locs)
+    println("True strengths: ", signal.strengths)
 
-    println("True locations: ", locs)
-    println("True strengths: ", strengths)
-
-    other_b = get_b(signal; method=:simple)
+    b = get_b(signal; method=:simple)
     Ms = get_Ms(n, b; method=:simple)
-    for loc in locs
+    contents = Dict()
+    for loc in signal.locs
         println(loc)
         for (i, M) in enumerate(Ms)
-            expected = expected_bin(dec_to_bin(loc, n), M)
-            println("\t$i: $expected")
+            j = expected_bin(dec_to_bin(loc, n), M)
+            if haskey(contents, (i,j))
+                append!(contents[(i,j)], loc)
+            else
+                contents[(i,j)] = [loc]
+            end
+            println("\t$i: $j")
         end
         println()
+    end
+    println("true contents:")
+    for (k,v) in contents
+        println("\t$k: $v")
     end
 
     methods = [:simple, :nso, :nso]
@@ -32,8 +39,9 @@ function test_random()
 
     println("SPRIGHT result: ", spright_wht)
     println("Used $(used_size / 2^n) of all time samples")
-    @test length(signal.loc) == length(spright_wht)
-    for (l, s) in zip(signal.loc, signal.strengths)
+    @test length(signal.locs) == length(spright_wht)
+    for (l, s) in zip(signal.locs, signal.strengths)
+        # println(spright_wht[l] / s)
         @test isapprox(spright_wht[l], s, atol=5*σ)
     end
 end
