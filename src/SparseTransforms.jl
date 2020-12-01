@@ -167,7 +167,7 @@ module SparseTransforms
                         if reconstruct_method == :mle
                             slice = S[:, selection]
                         end
-                        k, ρ = singleton_detection(
+                        k, ρ, s_k = singleton_detection(
                             col;
                             method=reconstruct_method,
                             selection=selection,
@@ -175,8 +175,6 @@ module SparseTransforms
                             n=signal.n,
                             D=D
                         ) # find the best fit singleton
-                        s_k = (-1) .^ (D * k)
-                        ρ = (s_k ⋅ col) / length(col)
                         residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])

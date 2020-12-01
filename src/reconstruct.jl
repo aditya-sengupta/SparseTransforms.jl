@@ -10,9 +10,9 @@ include("query.jl")
 """
 MLE value estimation of a singleton given its frequency.
 """
-function estimate_value(k::Int64, D::Array{Int64,2}, U_slice::Array{Float64,2})
+function estimate_value(k::BitArray{1}, D::BitArray{2}, U_slice)
     s_k = (-1) .^ (D * k)
-    return (s_k ⋅ col) / length(col)
+    return (s_k ⋅ U_slice) / length(U_slice), s_k
 end
 
 
@@ -21,7 +21,8 @@ Noiseless-case singleton detection. Assumes P = n + 1 and D = [0; I].
 See singleton_detection for full signature.
 """
 function singleton_detection_noiseless(U_slice; kwargs...)
-    return -sign.(U_slice * U_slice[1])[2:length(U_slice)] .== 1, 1
+    s_k = U_slice[2:length(U_slice)] / U_slice[1]
+    return -sign.(s_k) .== 1, U_slice[1], s_k
 end
 
 """
@@ -35,7 +36,7 @@ function singleton_detection_mle(U_slice; kwargs...)
     residual_vecs = (S_slice * Diagonal(alphas)) .- U_slice
     residuals = dropdims(sum(abs2, residual_vecs, dims=1); dims=1)
     k_sel = argmin(residuals)
-    return dec_to_bin(selection[k_sel] - 1, n), sign(alphas[k_sel])
+    return dec_to_bin(selection[k_sel] - 1, n), alphas[k_sel], S_slice[k_sel]
 end
 
 """
@@ -43,11 +44,12 @@ Non-sample-optimal singleton detection.
 """
 function singleton_detection_nso(U_slice; kwargs...)
     n = kwargs[:n]
+    D = kwargs[:D]
     p1 = length(U_slice) ÷ (n + 1)
     chunks = @pipe reshape(U_slice, (n + 1, p1)) |> transpose |> sign_spright.(_)
     chunks = chunks[:,2:n+1] .⊻ chunks[:,1]
-    est = @pipe sum(chunks, dims=1) |> dropdims(_, dims=1) |> (_ .> (p1 ÷ 2))
-    return est, 1
+    est_k = @pipe sum(chunks, dims=1) |> dropdims(_, dims=1) |> (_ .> (p1 ÷ 2))
+    return est_k, estimate_value(est_k, D, U_slice)...
 end
 
 """
