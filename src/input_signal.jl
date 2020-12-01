@@ -7,37 +7,37 @@ abstract type Signal end
 
 struct TestSignal <: Signal
     n::Int64
-    b::Int64
-    loc::Array{Int64,1}
+    k::Int64
+    locs::Array{Int64,1}
     strengths::Array{Float64,1}
     noise_sd::Float64
     signal_t::Array{Float64,1}
 
-    function TestSignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
+    function TestSignal(n::Int64, locs::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(locs)), noise_sd::Float64 = 0.0)
         N = 2^n
-        b = loc |> length |> log2 |> ceil |> Int64
+        k = locs |> length |> log2 |> ceil |> Int64
         noise = rand(Normal(0.0, noise_sd), N)
         wht = zeros(N)
-        for (l, s) in zip(loc, strengths)
+        for (l, s) in zip(locs, strengths)
             wht[l+1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
         end
         signal_t = fwht(wht) + noise
-        new(n, b, loc, strengths, noise_sd, signal_t)
+        new(n, k, locs, strengths, noise_sd, signal_t)
     end
 end
 
 struct LazySignal <: Signal
     n::Int64
-    b::Int64
-    loc::Array{Int64,1}
+    k::Int64
+    locs::Array{Int64,1}
     strengths::Array{Float64,1}
     noise_sd::Float64
     signal_t::Dict
 
-    function LazySignal(n::Int64, loc::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(loc)), noise_sd::Float64 = 0.0)
+    function LazySignal(n::Int64, locs::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(locs)), noise_sd::Float64 = 0.0)
         N = 2^n
-        b = loc |> length |> log2 |> ceil |> Int64
-        new(n, b, loc, strengths, noise_sd, Dict())
+        k = locs |> length |> log2 |> ceil |> Int64
+        new(n, k, locs, strengths, noise_sd, Dict())
     end
 end
 
@@ -46,8 +46,9 @@ function get_subsignal(signal::Signal, ind::Int64)
         return signal.signal_t[ind]
     else
         m = dec_to_bin(ind-1, signal.n)
-        sgns = (-1) .^ [m ⋅ dec_to_bin(l, signal.n) for l in signal.loc]
-        val = (1 / sqrt(2 ^ signal.n)) * (signal.strengths ⋅ sgns) + rand(Normal(0.0, signal.noise_sd))
+        sgns = (-1) .^ [m ⋅ dec_to_bin(l, signal.n) for l in signal.locs]
+        # val = (1 / sqrt(2 ^ signal.n)) * (signal.strengths ⋅ sgns) + rand(Normal(0.0, signal.noise_sd))
+        val = signal.strengths ⋅ sgns + rand(Normal(0.0, signal.noise_sd))
         signal.signal_t[ind] = val
         return val
     end
@@ -66,4 +67,20 @@ struct InputSignal <: Signal
         n = length(signal_t) |> log2 |> ceil |> Int64
         new(n, signal_t, noise_sd)
     end
+end
+
+function get_random_sparse_signal(n::Int64, k::Int64, σ::Float64, minpower::Float64, maxpower::Float64, lazy::Bool=true)
+    locs = sample(0:2^n-1, 2^k, replace=false)
+    strengths = Float64.(rand(Uniform(minpower, maxpower), 2^k)) .* (-1) .^ rand(Bool, 2^k)
+    if lazy
+        return LazySignal(n, locs, strengths, σ)
+    else
+        return TestSignal(n, locs, strengths, σ)
+    end
+end
+
+function get_random_delta_sparse_signal(n::Int64, σ::Float64, delta::Float64, c::Int64, minpower::Float64, maxpower::Float64)
+    k::Int64
+    k = ceil(c .* n .^ delta)
+    return get_random_sparse_signal(n, k, σ, minpower, maxpower, true)
 end

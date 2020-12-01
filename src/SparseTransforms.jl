@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal
+    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
 
@@ -116,12 +116,11 @@ module SparseTransforms
         # subsample, make the observation [U] matrices
         for M in Ms
             U, used_i = compute_delayed_subtransform(signal, M, D, transform)
-            push!(Us, sqrt(N)*U)
+            push!(Us, U)
             if report
                 used = union(used, used_i)
             end
         end
-        # U -> 1/√N ⋅ 1/√B ⋅ √N U_old = U_old / √B
 
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
 
@@ -251,6 +250,7 @@ module SparseTransforms
             end
         end
 
+        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
         if report
             return wht, length(used)
         else

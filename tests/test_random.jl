@@ -5,21 +5,19 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 16
+    n = 18
     k = 2
     σ = 1e-2
-    locs = sample(0:2^n-1, 2^k, replace=false)
-    strengths = Float64.(rand(Uniform(5, 10), 2^k)) .* (-1) .^ rand(Bool, 2^k)
-    signal = LazySignal(n, locs, strengths, σ)
+    minpower, maxpower = 0.5, 10.0
+    signal = get_random_sparse_signal(n, k, σ, minpower, maxpower)
 
-
-    println("True locations: ", locs)
-    println("True strengths: ", strengths)
+    println("True locations: ", signal.locs)
+    println("True strengths: ", signal.strengths)
 
     b = get_b(signal; method=:simple)
     Ms = get_Ms(n, b; method=:simple)
     contents = Dict()
-    for loc in locs
+    for loc in signal.locs
         println(loc)
         for (i, M) in enumerate(Ms)
             j = expected_bin(dec_to_bin(loc, n), M)
@@ -42,9 +40,9 @@ function test_random()
 
     println("SPRIGHT result: ", spright_wht)
     println("Used $(used_size / 2^n) of all time samples")
-    @test length(signal.loc) == length(spright_wht)
-    for (l, s) in zip(signal.loc, signal.strengths)
-        println(spright_wht[l] / s)
-        # @test isapprox(spright_wht[l], s, atol=5*σ)
+    @test length(signal.locs) == length(spright_wht)
+    for (l, s) in zip(signal.locs, signal.strengths)
+        # println(spright_wht[l] / s)
+        @test isapprox(spright_wht[l], s, atol=5*σ)
     end
 end
