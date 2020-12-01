@@ -10,7 +10,7 @@ module SparseTransforms
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
-    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal
+    export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal, get_random_delta_sparse_signal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
     export decode_with

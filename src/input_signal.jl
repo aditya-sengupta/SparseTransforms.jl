@@ -80,7 +80,6 @@ function get_random_sparse_signal(n::Int64, K::Int64, σ::Float64, minpower::Flo
 end
 
 function get_random_delta_sparse_signal(n::Int64, σ::Float64, delta::Float64, c::Int64, minpower::Float64, maxpower::Float64)
-    k::Int64
-    k = ceil(c .* n .^ delta)
-    return get_random_sparse_signal(n, k, σ, minpower, maxpower, true)
+    k = c .* n .^ delta |> ceil |> Int64
+    return get_random_sparse_signal(n, k, σ, minpower, maxpower)
 end
