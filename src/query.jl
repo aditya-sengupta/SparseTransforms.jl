@@ -24,7 +24,7 @@ function get_b_simple(signal::Signal)
     elseif (signal.n < 16)
         return signal.n ÷ 2
     else
-        return signal.n ÷ 4
+        return signal.n ÷ 4.0
     end
 end
 
@@ -56,8 +56,8 @@ end
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
 function get_Ms_simple(n::Int64, b::Int64)
-    @assert n % b == 0 "n must be exactly divisible by b"
-    num_to_get = n ÷ b
+    # @assert n % b == 0 "n must be exactly divisible by b"
+    num_to_get = ceil(n ÷ b)
 
     Ms = Any[]
     for i in num_to_get-1:-1:0
