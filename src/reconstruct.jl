@@ -72,7 +72,8 @@ function singleton_detection_so(U_slice; kwargs...)
     sgn = estimate_sign(U_slice[p1+1 : p1+p2])
     recvd_codeword = sgn ⊻ sign_spright.(U_slice[p1+p2+1 : p1+p2+p3])
     k = decode_with(recvd_codeword, D, code)
-    return k, sgn
+    s_k = (-1) .^ (D * k) # TODO: maybe only use last offsets?
+    return k, sgn, s_k
 end
 
 singleton_detection_lookup = Dict(
