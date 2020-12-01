@@ -34,7 +34,7 @@ function test_random()
         println("\t$k: $v")
     end
 
-    methods = [:simple, :nso, :nso]
+    methods = [:simple, :nso, :nso, :none]
     spright_wht, used_size = spright(signal, methods; verbose=true, report=true)
 
     println("SPRIGHT result: ", spright_wht)

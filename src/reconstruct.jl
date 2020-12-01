@@ -6,6 +6,7 @@ Methods for the reconstruction engine; specifically, to
 """
 
 include("query.jl")
+include("codes.jl")
 
 """
 MLE value estimation of a singleton given its frequency.
@@ -65,9 +66,12 @@ Sample-optimal singleton detection.
 function singleton_detection_so(U_slice; kwargs...)
     n = kwargs[:n]
     p1, p2, p3 = kwargs[:num_delays]
+    D = kwargs[:D]
     code = kwargs[:code]
-    sgn = estimate_sign(U_slice[:, p1+1:p1+p2])
-    k = decode_with(U_slice[:, p1+p2+1:p1+p2+p3], sgn, code)
+
+    sgn = estimate_sign(U_slice[p1+1 : p1+p2])
+    recvd_codeword = sgn ⊻ sign_spright.(U_slice[p1+p2+1 : p1+p2+p3])
+    k = decode_with(recvd_codeword, D, code)
     return k, sgn
 end
 

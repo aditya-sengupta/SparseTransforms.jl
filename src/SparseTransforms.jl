@@ -17,7 +17,8 @@ module SparseTransforms
     all_methods = Dict(
         "query" => [:simple],
         "delays" => [:identity_like, :random, :nso],
-        "reconstruct" => [:noiseless, :mle, :nso]
+        "reconstruct" => [:noiseless, :mle, :nso],
+        "code" => [:none]
     )
 
     function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
@@ -75,11 +76,12 @@ module SparseTransforms
     The WHT constructed by subsampling and peeling.
     """
     function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
-        for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
-        query_method, delays_method, reconstruct_method = methods
+        query_method, delays_method, reconstruct_method, code_method = methods
+        @assert (reconstruct_method != :so) || (code_method != :none)
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
 
@@ -100,10 +102,10 @@ module SparseTransforms
         if delays_method == :nso
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         elseif delays_method == :so
-            num_delays = signal.n * Int64(ceil(log2(signal.n)))
+            linearrithmic = signal.n * Int64(ceil(log2(signal.n)))
             num_delays = [linearrithmic,    # P1
                           signal.n,         # P2
-                          linearrithmic]    # P3 - TODO: fix for cutoff
+                          linearrithmic]    # P3
         else
             num_delays = signal.n + 1
         end
@@ -122,7 +124,7 @@ module SparseTransforms
             end
         end
 
-        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
+        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
@@ -173,6 +175,7 @@ module SparseTransforms
                             selection=selection,
                             S_slice=slice,
                             n=signal.n,
+                            num_delays=num_delays,
                             D=D
                         ) # find the best fit singleton
                         residual = col - ρ * s_k
