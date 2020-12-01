@@ -45,7 +45,8 @@ function test_reconstruct()
                         method=method_name,
                         selection=selection,
                         S_slice=S[:, selection],
-                        n=signal.n
+                        n=signal.n,
+                        D=D
                     ) # find the best fit singleton
                     push!(singleton_guesses, k |> bin_to_dec)
                 end

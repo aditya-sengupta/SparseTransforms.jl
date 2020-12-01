@@ -69,9 +69,9 @@ struct InputSignal <: Signal
     end
 end
 
-function get_random_sparse_signal(n::Int64, k::Int64, σ::Float64, minpower::Float64, maxpower::Float64, lazy::Bool=true)
-    locs = sample(0:2^n-1, 2^k, replace=false)
-    strengths = Float64.(rand(Uniform(minpower, maxpower), 2^k)) .* (-1) .^ rand(Bool, 2^k)
+function get_random_sparse_signal(n::Int64, K::Int64, σ::Float64, minpower::Float64, maxpower::Float64; lazy::Bool=true)
+    locs = sample(0:2^n-1, K, replace=false)
+    strengths = Float64.(rand(Uniform(minpower, maxpower), K)) .* (-1) .^ rand(Bool, K)
     if lazy
         return LazySignal(n, locs, strengths, σ)
     else

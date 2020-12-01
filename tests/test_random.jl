@@ -9,7 +9,7 @@ function test_random()
     k = 2
     σ = 1e-2
     minpower, maxpower = 0.5, 10.0
-    signal = get_random_sparse_signal(n, k, σ, minpower, maxpower)
+    signal = get_random_sparse_signal(n, 2^k, σ, minpower, maxpower)
 
     println("True locations: ", signal.locs)
     println("True strengths: ", signal.strengths)
@@ -35,7 +35,7 @@ function test_random()
         println("\t$k: $v")
     end
 
-    methods = [:simple, :nso, :nso]
+    methods = [:simple, :nso, :nso, :none]
     spright_wht, used_size = spright(signal, methods; verbose=true, report=true)
 
     println("SPRIGHT result: ", spright_wht)
