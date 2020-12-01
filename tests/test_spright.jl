@@ -18,7 +18,7 @@ function test_spright()
     bin_cardinalities = map(M -> bin_cardinality(signal, M, D), Ms)
 
     println("Testing full transform...")
-    methods = [:simple, :nso, :nso]
+    methods = [:simple, :nso, :nso, :none]
     spright_wht, utilization = spright(signal, methods; verbose=true, report=true)
     println("Used $(utilization / 2^n) of all time samples")
 

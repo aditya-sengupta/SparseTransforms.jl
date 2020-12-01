@@ -13,11 +13,13 @@ module SparseTransforms
     export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
+    export decode_with
 
     all_methods = Dict(
         "query" => [:simple],
         "delays" => [:identity_like, :random, :nso],
-        "reconstruct" => [:noiseless, :mle, :nso]
+        "reconstruct" => [:noiseless, :mle, :nso],
+        "code" => [:none]
     )
 
     function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
@@ -75,11 +77,12 @@ module SparseTransforms
     The WHT constructed by subsampling and peeling.
     """
     function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
-        for (method_type, method_name) in zip(["query", "delays", "reconstruct"], methods)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
-        query_method, delays_method, reconstruct_method = methods
+        query_method, delays_method, reconstruct_method, code = methods
+        @assert (reconstruct_method != :so) || (code != :none)
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
 
@@ -100,14 +103,14 @@ module SparseTransforms
         if delays_method == :nso
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         elseif delays_method == :so
-            num_delays = signal.n * Int64(ceil(log2(signal.n)))
+            linearrithmic = signal.n * Int64(ceil(log2(signal.n)))
             num_delays = [linearrithmic,    # P1
                           signal.n,         # P2
-                          linearrithmic]    # P3 - TODO: fix for cutoff
+                          linearrithmic]    # P3
         else
             num_delays = signal.n + 1
         end
-        D = get_D(signal.n; method=delays_method, num_delays=num_delays)
+        D = get_D(signal.n; method=delays_method, num_delays=num_delays, code=code)
         if reconstruct_method == :mle
             K = binary_ints(signal.n)
             S = (-1) .^(D * K)
@@ -122,7 +125,7 @@ module SparseTransforms
             end
         end
 
-        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * num_delays # noise threshold
+        cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
         select_froms = []
@@ -167,20 +170,20 @@ module SparseTransforms
                         if reconstruct_method == :mle
                             slice = S[:, selection]
                         end
-                        k, sgn = singleton_detection(
+                        k, ρ, s_k = singleton_detection(
                             col;
                             method=reconstruct_method,
                             selection=selection,
                             S_slice=slice,
-                            n=signal.n
+                            n=signal.n,
+                            num_delays=num_delays,
+                            D=D
                         ) # find the best fit singleton
-                        s_k = (-1) .^ (D * k)
-                        ρ = (s_k ⋅ col) * sgn / length(col)
-                        residual = col - sgn * ρ * s_k
+                        residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, ρ, sgn)
+                            singletons[(i, j)] = (k, ρ)
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
@@ -206,12 +209,10 @@ module SparseTransforms
             # balls to peel
             balls_to_peel = Set()
             ball_values = Dict()
-            ball_sgn = Dict()
-            for (_, (k, rho, sgn)) in singletons
+            for (_, (k, ρ)) in singletons
                 ball = bin_to_dec(k)
                 push!(balls_to_peel, ball)
-                ball_values[ball] = rho
-                ball_sgn[ball] = sgn
+                ball_values[ball] = ρ
             end
 
             if verbose
@@ -225,12 +226,12 @@ module SparseTransforms
                 k = dec_to_bin(ball, signal.n)
 
                 push!(locs, k)
-                push!(strengths, ball_sgn[ball]*ball_values[ball])
+                push!(strengths, ball_values[ball])
 
                 for (l, M) in enumerate(Ms)
                     peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
                     signature_in_stage = (-1) .^ (D * k)
-                    to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
+                    to_subtract = ball_values[ball] * signature_in_stage
                     U = Us[l]
                     U_slice = U[peel, :]
                     Us[l][peel,:] = U_slice - to_subtract

@@ -49,7 +49,7 @@ Sign function that matches the convention (footnote 2 on page 11):
 returns 0 for positive reals and 1 for negative reals.
 """
 function sign_spright(x)
-    return Int64(x < 0)
+    return Bool(x < 0)
 end
 
 function expected_bin(k::BitArray{1}, M::BitArray{2})
