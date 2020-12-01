@@ -5,7 +5,6 @@ using LinearAlgebra
 
 function test_reconstruct()
     query_method = :simple
-    delays_method = :nso
 
     n = 4
     locs = [4, 6, 10, 15]
@@ -13,16 +12,7 @@ function test_reconstruct()
     signal = TestSignal(n, locs, strengths, 0.0)
     b = get_b(signal; method=query_method)
     Ms = get_Ms(signal.n, b; method=query_method)
-    D = get_D(signal.n; method=delays_method, num_delays=2*n)
-
-    Us, Ss = Any[], Any[]
     K = binary_ints(signal.n)
-
-    for M in Ms
-        U, used_i = compute_delayed_subtransform(signal, M, D, fwht)
-        push!(Us, U)
-        push!(Ss, (-1) .^(D * K))
-    end
 
     select_froms = []
     for M in Ms
@@ -32,10 +22,22 @@ function test_reconstruct()
 
     cutoff = 2 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * (signal.n + 1) # noise threshold
 
-    for method_name in [:nso] # all_methods["reconstruct"]
+    for method_name in all_methods["reconstruct"]
         println("Testing reconstruction with $method_name")
+        if method_name == :nso
+            delays_method = :nso
+        else
+            delays_method = :identity_like
+        end
+        D = get_D(signal.n; method=delays_method, num_delays=2*n)
+        Us = Any[]
+        for M in Ms
+            U, used_i = compute_delayed_subtransform(signal, M, D, fwht)
+            push!(Us, U)
+        end
+        S = (-1) .^ (D * K)
         singleton_guesses = []
-        for (i, (U, S, select_from)) in enumerate(zip(Us, Ss, select_froms))
+        for (i, (U, select_from)) in enumerate(zip(Us, select_froms))
             col_gen = U |> eachrow |> enumerate
             for (j, col) in col_gen
                 if col⋅col > cutoff

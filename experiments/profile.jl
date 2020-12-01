@@ -4,17 +4,23 @@ using Plots
 
 nrange = 4:20
 num_runs = 5
-methods = [:simple, :nso, :nso]
-times = Float64[]
-samples = Float64[]
+methods = [:simple, :identity_like, :mle]
 σ = 1e-2
 
+function method_name(methods::Array{Symbol,1})
+    if methods[3] == :nso
+        return "non-sample-optimal"
+    elseif methods[3] == :mle
+        return "maximum likelihood"
+    end
+end
+
 function bvals(n::Int64, btype::Symbol)
-    if btype == :const
+    if btype == :constant
         return 2
-    elseif btype == :scale
+    elseif btype == :scaling
         if n < 8
-            return n ÷ 2
+            return 2
         else
             return n ÷ 4
         end
@@ -23,6 +29,9 @@ end
 
 function profile(methods::Array{Symbol,1}, btype::Symbol)
     brange = map(x -> bvals(x, btype), nrange)
+    times = Float64[]
+    samples = Float64[]
+    println(brange)
     @showprogress for (n, b) in zip(nrange, brange)
         t = 0
         s = 0
@@ -38,6 +47,7 @@ function profile(methods::Array{Symbol,1}, btype::Symbol)
         push!(times, t / num_runs)
     end
     return samples, times
+
 end
 
 function plot_samples(methods::Array{Symbol,1}, btype::Symbol)
@@ -45,5 +55,5 @@ function plot_samples(methods::Array{Symbol,1}, btype::Symbol)
     samples, times = profile(methods, btype)
     plot()
     plot!(nrange, (2 .^ brange) .* nrange ./ (2 .^ nrange); label="asymptotic trend")
-    plot!(nrange, samples; label="experimental values", xlabel="log2(signal length)", ylabel="sample fraction", title="Sample efficiency with $(string.(methods)) and sparsity $(string(btype))")
+    plot!(nrange, samples; label="experimental values", xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with $(method_name(methods)) decoding and $(string(btype)) sparsity")
 end
