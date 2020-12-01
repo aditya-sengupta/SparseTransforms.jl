@@ -5,10 +5,11 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 32
-    k = 4
+    n = 18
+    k = 2
     σ = 1e-2
-    signal = get_random_sparse_signal(n, k, σ, 0.1, 10.0)
+    minpower, maxpower = 0.5, 10.0
+    signal = get_random_sparse_signal(n, k, σ, minpower, maxpower)
 
     println("True locations: ", signal.locs)
     println("True strengths: ", signal.strengths)

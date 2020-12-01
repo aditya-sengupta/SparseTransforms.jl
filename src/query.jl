@@ -21,8 +21,10 @@ function get_b_simple(signal::Signal)
         return 2
     elseif (signal.n == 8) || (signal.n == 16)
         return 4
+    elseif (signal.n < 16)
+        return signal.n ÷ 2
     else
-        signal.n ÷ 4
+        return signal.n ÷ 4
     end
 end
 
@@ -54,7 +56,6 @@ end
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
 function get_Ms_simple(n::Int64, b::Int64)
-
     @assert n % b == 0 "n must be exactly divisible by b"
     num_to_get = n ÷ b
 
@@ -65,6 +66,16 @@ function get_Ms_simple(n::Int64, b::Int64)
             M[b*i+j, j] = 1
         end
         push!(Ms, M)
+    end
+    return Ms
+end
+
+function get_Ms_random(n::Int64, b::Int64)
+    num_to_get = n ÷ b
+    Ms = Any[]
+
+    for i in 1:num_to_get
+        push!(Ms, BitArray(rand(n, b)))
     end
     return Ms
 end
