@@ -13,6 +13,7 @@ module SparseTransforms
     export Signal, TestSignal, InputSignal, LazySignal, get_subsignal, get_random_sparse_signal
     export get_D, get_b, get_Ms, subsample_indices, compute_delayed_subtransform
     export singleton_detection, bin_cardinality
+    export decode_with
 
     all_methods = Dict(
         "query" => [:simple],
@@ -80,8 +81,8 @@ module SparseTransforms
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
-        query_method, delays_method, reconstruct_method, code_method = methods
-        @assert (reconstruct_method != :so) || (code_method != :none)
+        query_method, delays_method, reconstruct_method, code = methods
+        @assert (reconstruct_method != :so) || (code != :none)
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
 
@@ -109,7 +110,7 @@ module SparseTransforms
         else
             num_delays = signal.n + 1
         end
-        D = get_D(signal.n; method=delays_method, num_delays=num_delays)
+        D = get_D(signal.n; method=delays_method, num_delays=num_delays, code=code)
         if reconstruct_method == :mle
             K = binary_ints(signal.n)
             S = (-1) .^(D * K)

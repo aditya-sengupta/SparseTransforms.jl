@@ -66,6 +66,7 @@ Sample-optimal singleton detection.
 function singleton_detection_so(U_slice; kwargs...)
     n = kwargs[:n]
     p1, p2, p3 = kwargs[:num_delays]
+    @assert length(U_slice) == p1+p2+p3
     D = kwargs[:D]
     code = kwargs[:code]
 
