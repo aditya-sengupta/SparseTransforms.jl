@@ -24,7 +24,7 @@ function get_b_simple(signal::Signal)
     elseif (signal.n < 16)
         return signal.n ÷ 2
     else
-        return signal.n ÷ 4.0
+        return signal.n ÷ 4
     end
 end
 
@@ -52,20 +52,25 @@ function get_b(signal::Signal; method=:simple)::Int64
     return get_b_lookup[method](signal)
 end
 
+function get_partial_I(n, b, k)
+    M = falses(n, b)
+    for j in 1:b
+        M[k+j, j] = 1
+    end
+    return M
+end
+
 """
 A semi-arbitrary fixed choice of the subsampling matrices. See get_Ms for full signature.
 """
 function get_Ms_simple(n::Int64, b::Int64)
     # @assert n % b == 0 "n must be exactly divisible by b"
-    num_to_get = ceil(n ÷ b)
+    num_to_get = Int64(ceil(n / b))
 
     Ms = Any[]
-    for i in num_to_get-1:-1:0
-        M = falses(n, b)
-        for j in 1:b
-            M[b*i+j, j] = 1
-        end
-        push!(Ms, M)
+    push!(Ms, get_partial_I(n, b, n-b))
+    for i in num_to_get-2:-1:0
+        push!(Ms, get_partial_I(n, b, b*i))
     end
     return Ms
 end
