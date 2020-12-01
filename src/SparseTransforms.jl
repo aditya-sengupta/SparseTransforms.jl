@@ -167,20 +167,21 @@ module SparseTransforms
                         if reconstruct_method == :mle
                             slice = S[:, selection]
                         end
-                        k, sgn = singleton_detection(
+                        k, ρ = singleton_detection(
                             col;
                             method=reconstruct_method,
                             selection=selection,
                             S_slice=slice,
-                            n=signal.n
+                            n=signal.n,
+                            D=D
                         ) # find the best fit singleton
                         s_k = (-1) .^ (D * k)
-                        ρ = (s_k ⋅ col) * sgn / length(col)
-                        residual = col - sgn * ρ * s_k
+                        ρ = (s_k ⋅ col) / length(col)
+                        residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
                             push!(multitons, [i, j])
                         else # declare as singleton
-                            singletons[(i, j)] = (k, ρ, sgn)
+                            singletons[(i, j)] = (k, ρ)
                         end # if residual norm > cutoff
                     end # if col norm > cutoff
                 end # for col
@@ -206,12 +207,10 @@ module SparseTransforms
             # balls to peel
             balls_to_peel = Set()
             ball_values = Dict()
-            ball_sgn = Dict()
-            for (_, (k, rho, sgn)) in singletons
+            for (_, (k, ρ)) in singletons
                 ball = bin_to_dec(k)
                 push!(balls_to_peel, ball)
-                ball_values[ball] = rho
-                ball_sgn[ball] = sgn
+                ball_values[ball] = ρ
             end
 
             if verbose
@@ -225,12 +224,12 @@ module SparseTransforms
                 k = dec_to_bin(ball, signal.n)
 
                 push!(locs, k)
-                push!(strengths, ball_sgn[ball]*ball_values[ball])
+                push!(strengths, ball_values[ball])
 
                 for (l, M) in enumerate(Ms)
                     peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
                     signature_in_stage = (-1) .^ (D * k)
-                    to_subtract = ball_sgn[ball] * ball_values[ball] * signature_in_stage
+                    to_subtract = ball_values[ball] * signature_in_stage
                     U = Us[l]
                     U_slice = U[peel, :]
                     Us[l][peel,:] = U_slice - to_subtract

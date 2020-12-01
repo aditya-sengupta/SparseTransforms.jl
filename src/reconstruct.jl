@@ -8,6 +8,15 @@ Methods for the reconstruction engine; specifically, to
 include("query.jl")
 
 """
+MLE value estimation of a singleton given its frequency.
+"""
+function estimate_value(k::Int64, D::Array{Int64,2}, U_slice::Array{Float64,2})
+    s_k = (-1) .^ (D * k)
+    return (s_k ⋅ col) / length(col)
+end
+
+
+"""
 Noiseless-case singleton detection. Assumes P = n + 1 and D = [0; I].
 See singleton_detection for full signature.
 """
@@ -45,7 +54,7 @@ end
 Robust sign estimation for sample-optimal singleton detection.
 """
 function estimate_sign(U_slice)
-    return 1
+    return sum(sign_spright.(U_slice)) > length(U_slice) ÷ 2
 end
 
 """
