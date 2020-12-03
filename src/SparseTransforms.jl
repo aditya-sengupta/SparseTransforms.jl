@@ -16,7 +16,7 @@ module SparseTransforms
     export decode_with
 
     all_methods = Dict(
-        "query" => [:simple],
+        "query" => [:simple, :random],
         "delays" => [:identity_like, :random, :nso],
         "reconstruct" => [:noiseless, :mle, :nso],
         "code" => [:none]
@@ -229,7 +229,7 @@ module SparseTransforms
                 push!(strengths, ball_values[ball])
 
                 for (l, M) in enumerate(Ms)
-                    peel = @pipe M' * k |> Bool.(_) |> bin_to_dec |> _ + 1
+                    peel = @pipe M' * k |> _ .% 2 |> Bool.(_) |> bin_to_dec |> _ + 1
                     signature_in_stage = (-1) .^ (D * k)
                     to_subtract = ball_values[ball] * signature_in_stage
                     U = Us[l]

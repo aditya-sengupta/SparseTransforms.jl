@@ -36,9 +36,10 @@ function profile_fixed_b(methods::Array{Symbol,1}, btype::Symbol)
         t = 0
         s = 0
         for i = 1:num_runs
-            locs = sample(0:2^n-1, 2^b, replace=false)
-            strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
-            signal = LazySignal(n, locs, strengths, σ)
+            # locs = sample(0:2^n-1, 2^b, replace=false)
+            # strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
+            # signal = LazySignal(n, locs, strengths, σ)
+            signal = get_random_sparse_signal(n, 2^b, σ, 0.1, 10)
             res = @timed spright(signal, methods; report=true)
             s += res.value[2]
             t += res.time
@@ -81,7 +82,30 @@ function plot_samples(methods::Array{Symbol,1}, btype::Symbol)
 end
 
 function plot_delta_profile()
-    times, samples = profile_delta_sparse(methods, deltas)
+    samples, times = profile_delta_sparse(methods, deltas)
     plot()
-    plot!(nrange, samples; label=[string(δ) for δ in deltas], xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with sparsity O(N^delta)")
+    plot!(nrange, samples; label=hcat(deltas...), xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with sparsity O(N^delta)")
+    brange = map(x -> 2^(-0.7x) * x^2 / 12.5, nrange)
+    plot!(nrange, brange; label="asymptotic trend")
+end
+
+function plot_delta_times()
+    samples, times = profile_delta_sparse(methods, deltas)
+    plot()
+    plot!(nrange, times; label=hcat(deltas...), xlabel="log2(signal length)", ylabel="runtime", title="Runtime with sparsity O(N^delta)")
+    brange = map(x -> 2^(0.3x) * x^3, nrange)
+    # println(times[1,1])
+    # println(times[1][1])
+    plot!(nrange, brange * times[1][1] / brange[1] / 5; label="asymptotic trend")
+end
+
+function plot_delta_times_m_diff()
+    samples, times = profile_delta_sparse(methods, [0.3])
+    plot()
+    plot!(nrange, times; label="identity subsampling", xlabel="log2(signal length)", ylabel="runtime", title="Runtime with sparsity O(N^delta)")
+    methods[1] = :random
+    samples2, times2 = profile_delta_sparse(methods, [0.3])
+    plot!(nrange, times2; label="random subsampling")
+    brange = map(x -> 2^(0.3x) * x^3, nrange)
+    plot!(nrange, brange * times[1][1] / brange[1] / 5; label="asymptotic trend")
 end

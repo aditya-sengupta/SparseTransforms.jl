@@ -11,6 +11,7 @@ Methods for the query generator: specifically, to
 
 include("input_signal.jl")
 using StatsBase
+using Random
 
 """
 A semi-arbitrary fixed choice of the sparsity coefficient.
@@ -29,7 +30,8 @@ function get_b_simple(signal::Signal)
 end
 
 get_b_lookup = Dict(
-    :simple => get_b_simple
+    :simple => get_b_simple,
+    :random => get_b_simple
 )
 
 """
@@ -80,13 +82,14 @@ function get_Ms_random(n::Int64, b::Int64)
     Ms = Any[]
 
     for i in 1:num_to_get
-        push!(Ms, BitArray(rand(n, b)))
+        push!(Ms, bitrand(n, b))
     end
     return Ms
 end
 
 get_Ms_lookup = Dict(
-    :simple => get_Ms_simple
+    :simple => get_Ms_simple,
+    :random => get_Ms_random
 )
 
 function get_Ms(n::Int64, b::Int64; method=:simple)::Array{BitArray,1}
@@ -186,7 +189,7 @@ The (decimal) subsample indices.
 """
 function subsample_indices(M, d)
     L = binary_ints(size(M, 2))
-    inds_binary = Bool.(M*L .⊻ d)
+    inds_binary = Bool.((M*L .⊻ d) .% 2)
     return @pipe inds_binary |> eachcol |> collect |> bin_to_dec.(_) .+ 1
 end
 

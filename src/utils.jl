@@ -53,5 +53,5 @@ function sign_spright(x)
 end
 
 function expected_bin(k::BitArray{1}, M::BitArray{2})
-    return @pipe M'k |> Bool.(_) |> bin_to_dec(_) + 1
+    return @pipe M'k |> _ .% 2 |> Bool.(_) |> bin_to_dec(_) + 1
 end
