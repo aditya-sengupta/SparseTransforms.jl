@@ -4,7 +4,7 @@ Implementations of and extensions to the SPRIGHT (SParse Robust Iterative Graph-
 
 **Authors and Acknowledgements**
 
-Version 0.1.0 of this package was written by Aditya Sengupta (@aditya-sengupta), Tynan Sigg (@trsigg), Catherine Huang (@thecatherinehuang) and Ben Hoberman (@bhoberman) as the final project for EECS 229A at UC Berkeley in Fall 2020, with advice from Orhan Ocal, Amirali Aghazadeh, and Kannan Ramchandran.
+This package was written by Aditya Sengupta (@aditya-sengupta), Tynan Sigg (@trsigg), Catherine Huang (@thecatherinehuang) and Ben Hoberman (@bhoberman) as the final project for EECS 229A at UC Berkeley in Fall 2020, with advice from Orhan Ocal, Amirali Aghazadeh, and Kannan Ramchandran.
 
 **References**
 
