@@ -1,12 +1,12 @@
 """
-Sparse transform (FFAST/SPRIGHT) decoding main file. Logic flow:
+Sparse transform (SPRIGHT) decoding main file. Logic flow:
 
 1. Generate a signal from input_signal.jl
 2. Subsample from query.jl
 3. Peel using reconstruct.jl
 """
 module SparseTransforms
-    export all_methods, spright, ffast, method_test, method_report
+    export all_methods, spright, method_test, method_report
     using ProgressMeter
     include("reconstruct.jl")
     export fwht, bin_to_dec, dec_to_bin, binary_ints, sign_spright, expected_bin
@@ -24,10 +24,6 @@ module SparseTransforms
 
     function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
         return transform(signal, methods, fwht; verbose=verbose, report=report)
-    end
-
-    function ffast(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
-        return transform(signal, methods, fft; verbose=verbose, report=report)
     end
 
     """

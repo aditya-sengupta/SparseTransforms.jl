@@ -1,21 +1,10 @@
 # SparseTransforms.jl
 
-Implementations of/extensions to the SPRIGHT (SParse Robust Iterative Graph-based Hadamard Transform) and FFAST (Fast Fourier Aliasing-based Sparse Transform) algorithms in Julia.
+Implementations of and extensions to the SPRIGHT (SParse Robust Iterative Graph-based Hadamard Transform) algorithm in Julia, and potentially the FFAST (Fast Fourier Aliasing-based Sparse Transform) algorithm too.
 
-**Setup**
+**Authors and Acknowledgements**
 
-In order to start using SPRIGHT/FFAST, the Julia programming language is required, ideally with the Revise package. The specific steps to set this up are:
-
-1. `git clone` the repo to wherever you want
-2. Download Julia from julialang.org
-3. Run `julia` from terminal, type `]`, and run `add Revise`
-4. Backspace and run `using Revise` (the purpose of this is just to have it precompile once)
-5. Go to `~/.julia/config/startup.jl` (or the equivalent for a different OS) and add `using Revise` there
-6. `cd` to wherever you cloned the repo and run `julia`
-7. Within the REPL type `]` and run `activate .`
-8. Hit backspace and type `using SparseTransforms`  - this precompile will take a while, but you'll only have to do it once per change to the codebase.
-
-You can now access the `spright` and `ffast` functions, which carries out the sparse W-H transform or sparse FFT respectively of a signal; this should be the only interface needed for users of SPRIGHT/FFAST.
+Version 0.1.0 of this package was written by Aditya Sengupta (@aditya-sengupta), Tynan Sigg (@trsigg), Catherine Huang (@thecatherinehuang) and Ben Hoberman (@bhoberman) as the final project for EECS 229A at UC Berkeley in Fall 2020, with advice from Orhan Ocal, Amirali Aghazadeh, and Kannan Ramchandran.
 
 **References**
 
