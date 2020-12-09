@@ -19,7 +19,7 @@ function test_spright()
 
     println("Testing full transform...")
     # methods = [:simple, :random, :mle, :none]
-    methods = [:random, :nso, :nso, :none]
+    methods = [:simple, :nso, :nso, :none]
     spright_wht, utilization = spright(signal, methods; verbose=true, report=true)
     println("Used $(utilization / 2^n) of all time samples")
 
