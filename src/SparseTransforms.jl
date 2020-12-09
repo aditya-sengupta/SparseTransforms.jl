@@ -165,7 +165,7 @@ module SparseTransforms
                 col_gen = U |> eachrow |> enumerate
                 for (j, col) in col_gen
                     if col⋅col > cutoff
-                        selection = findall(==(j), select_from) # pick all the k such that M.T @ k = j
+                        selection = findall(==(j-1), select_from) # pick all the k such that M.T @ k = j
                         slice = 0
                         if reconstruct_method == :mle
                             slice = S[:, selection]

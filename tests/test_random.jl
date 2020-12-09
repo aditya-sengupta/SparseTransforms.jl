@@ -5,9 +5,9 @@ using Test
 Random.seed!(1234)
 
 function test_random()
-    n = 18
+    n = 8
     k = 2
-    σ = 1e-2
+    σ = 1e-5
     minpower, maxpower = 0.5, 10.0
     signal = get_random_sparse_signal(n, 2^k, σ, minpower, maxpower)
 
@@ -36,6 +36,7 @@ function test_random()
     end
 
     methods = [:simple, :nso, :nso, :none]
+    # methods = [:simple, :random, :mle, :none]
     spright_wht, used_size = spright(signal, methods; verbose=true, report=true)
 
     println("SPRIGHT result: ", spright_wht)

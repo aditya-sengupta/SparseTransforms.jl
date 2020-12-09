@@ -22,8 +22,8 @@ Noiseless-case singleton detection. Assumes P = n + 1 and D = [0; I].
 See singleton_detection for full signature.
 """
 function singleton_detection_noiseless(U_slice; kwargs...)
-    s_k = U_slice[2:length(U_slice)] / U_slice[1]
-    return -sign.(s_k) .== 1, U_slice[1], s_k
+    signs = sign_spright.(U_slice / U_slice[1])
+    return signs[2:length(signs)], U_slice[1], (-1) .^ signs
 end
 
 """
@@ -37,7 +37,7 @@ function singleton_detection_mle(U_slice; kwargs...)
     residual_vecs = (S_slice * Diagonal(alphas)) .- U_slice
     residuals = dropdims(sum(abs2, residual_vecs, dims=1); dims=1)
     k_sel = argmin(residuals)
-    return dec_to_bin(selection[k_sel] - 1, n), alphas[k_sel], S_slice[k_sel]
+    return dec_to_bin(selection[k_sel] - 1, n), alphas[k_sel], S_slice[:, k_sel]
 end
 
 """
