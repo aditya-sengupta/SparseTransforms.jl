@@ -3,7 +3,8 @@ using Distributions
 
 include("utils.jl")
 
-abstract type Signal end
+abstract type Signal <: AbstractArray{Float64,1} end # maybe extend to N-d SPRIGHT? 
+Base.IndexStyle(::Signal) = IndexLinear()
 
 struct TestSignal <: Signal
     n::Int64
@@ -26,6 +27,10 @@ struct TestSignal <: Signal
     end
 end
 
+Base.size(s::TestSignal) = size(s.signal_t)
+Base.getindex(s::TestSignal, i::Int64) = s.signal_t[i]
+Base.setindex!(s::TestSignal, v, i::Int64) = (s.signal_t[i] = v)
+
 struct LazySignal <: Signal
     n::Int64
     k::Int64
@@ -40,6 +45,10 @@ struct LazySignal <: Signal
         new(n, k, locs, strengths, noise_sd, Dict())
     end
 end
+
+Base.size(s::LazySignal) = length(s.signal_t)
+Base.getindex(s::LazySignal, i::Int64) = s.signal_t[i]
+Base.setindex!(s::LazySignal, v, i::Int64) = (s.signal_t[i] = v)
 
 function get_subsignal(signal::Signal, ind::Int64)
     if isa(signal.signal_t, Array) || haskey(signal.signal_t, ind)
@@ -68,6 +77,10 @@ struct InputSignal <: Signal
         new(n, signal_t, noise_sd)
     end
 end
+
+Base.size(s::InputSignal) = size(s.signal_t)
+Base.getindex(s::InputSignal, i::Int64) = s.signal_t[i]
+Base.setindex!(s::InputSignal, v, i::Int64) = (s.signal_t[i] = v)
 
 function get_random_sparse_signal(n::Int64, K::Int64, σ::Float64, minpower::Float64, maxpower::Float64; lazy::Bool=true)
     locs = sample(0:2^n-1, K, replace=false)
