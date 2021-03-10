@@ -1,0 +1,49 @@
+        - using SparseTransforms
+        - using StatsBase, Random, Distributions
+        - using Test
+        - 
+        - Random.seed!(1234)
+        - 
+        - function test_random()
+        -     n = 8
+        -     k = 2
+        -     σ = 1e-5
+        -     minpower, maxpower = 0.5, 10.0
+        0     signal = get_random_sparse_signal(n, 2^k, σ, minpower, maxpower)
+        - 
+        0     println("True locations: ", signal.locs)
+        0     println("True strengths: ", signal.strengths)
+        - 
+        0     b = get_b(signal; method=:simple)
+        0     Ms = get_Ms(n, b; method=:simple)
+    30400     contents = Dict()
+        0     for loc in signal.locs
+        0         println(loc)
+        0         for (i, M) in enumerate(Ms)
+        0             j = expected_bin(dec_to_bin(loc, n), M)
+        0             if haskey(contents, (i,j))
+        0                 append!(contents[(i,j)], loc)
+        -             else
+    35328                 contents[(i,j)] = [loc]
+        -             end
+   219248             println("\t$i: $j")
+        -         end
+    14144         println()
+        -     end
+     7872     println("true contents:")
+        0     for (k,v) in contents
+    62400         println("\t$k: $v")
+        -     end
+        - 
+     5600     methods = [:simple, :nso, :nso, :none]
+        -     # methods = [:simple, :random, :mle, :none]
+        0     spright_wht, used_size = spright(signal, methods; verbose=true, report=true)
+        - 
+        0     println("SPRIGHT result: ", spright_wht)
+    41216     println("Used $(used_size / 2^n) of all time samples")
+    16800     @test length(signal.locs) == length(spright_wht)
+        0     for (l, s) in zip(signal.locs, signal.strengths)
+        -         # println(spright_wht[l] / s)
+   102400         @test isapprox(spright_wht[l], s, atol=5*σ)
+        -     end
+        - end
