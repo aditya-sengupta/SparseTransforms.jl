@@ -1,6 +1,11 @@
+"""
+Methods to profile the SPRIGHT algorithm and this implementation of it.
+"""
+
 using SparseTransforms
 using ProgressMeter
 using Plots
+using Profile
 
 nrange = 4:20
 num_runs = 5

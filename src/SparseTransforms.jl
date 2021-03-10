@@ -248,6 +248,7 @@ module SparseTransforms
         end
 
         wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
+        wht = filter(f -> abs(last(f)) ≥ signal.noise_sd, wht)
         if report
             return wht, length(used)
         else
