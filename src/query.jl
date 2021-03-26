@@ -222,6 +222,6 @@ end
 function compute_delayed_subtransform(signal::Signal, M, D, transform::Function)
     inds = map(d -> subsample_indices(M, d), D |> eachrow |> collect)
     used_inds = reduce(union, inds)
-    samples_to_transform = map(x -> get_subsignal(signal, x), inds)
+    samples_to_transform = map(x -> signal[x], inds)
     return hcat(transform.(samples_to_transform)...), used_inds
 end
