@@ -22,8 +22,8 @@ module SparseTransforms
         "code" => [:none]
     )
 
-    function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
-        return transform(signal, methods, fwht; verbose=verbose, report=report)
+    function spright(signal::Signal, methods_list::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods_list, fwht; verbose=verbose, report=report)
     end
 
     """
@@ -35,7 +35,7 @@ module SparseTransforms
     signal : TestSignal object.
     The signal to be transformed / compared to.
 
-    methods : Array{Symbol,1}
+    methods_list : Array{Symbol,1}
     The three symbols [query_method, delays_method, reconstruct_method].
     All implemented methods are available in `all_methods`: if you add a new method, make sure to update `all_methods`.
 
@@ -72,12 +72,12 @@ module SparseTransforms
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
-        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods)
+    function transform(signal::Signal, methods_list::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods_list)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
-        query_method, delays_method, reconstruct_method, code = methods
+        query_method, delays_method, reconstruct_method, code = methods_list
         @assert (reconstruct_method != :so) || (code != :none)
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point

@@ -199,7 +199,7 @@ and returns the subsample WHT along with the delays.
 
 Arguments
 ---------
-signal : TestSignal
+signal : Signal
 The signal to subsample, delay, and compute the WHT of.
 
 M : n×b Array{Bool,2}

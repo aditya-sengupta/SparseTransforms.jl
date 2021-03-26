@@ -42,7 +42,6 @@ struct LazySignal <: Signal
     function LazySignal(n::Int64, locs::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(locs)), noise_sd::Float64 = 0.0)
         N = 2^n
         k = locs |> length |> log2 |> ceil |> Int64
-
         return new(n, k, locs, strengths, noise_sd, Dict{Int64,Float64}())
     end
 end
