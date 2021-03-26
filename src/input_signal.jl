@@ -20,7 +20,7 @@ struct TestSignal <: Signal
         noise = rand(Normal(0.0, noise_sd), N)
         wht = zeros(N)
         for (l, s) in zip(locs, strengths)
-            wht[l+1] = s # 1-indexing doesn't work here and I'm too lazy to use an offsetarray
+            wht[l+1] = s
         end
         signal_t = fwht(wht) + noise
         new(n, k, locs, strengths, noise_sd, signal_t)
@@ -42,29 +42,44 @@ struct LazySignal <: Signal
     function LazySignal(n::Int64, locs::Array{Int64,1}, strengths::Array{Float64,1} = ones(length(locs)), noise_sd::Float64 = 0.0)
         N = 2^n
         k = locs |> length |> log2 |> ceil |> Int64
-        new(n, k, locs, strengths, noise_sd, Dict())
+
+        return new(n, k, locs, strengths, noise_sd, Dict{Int64,Float64}())
     end
 end
 
 Base.size(s::LazySignal) = length(s.signal_t)
-Base.getindex(s::LazySignal, i::Int64) = s.signal_t[i]
-Base.setindex!(s::LazySignal, v, i::Int64) = (s.signal_t[i] = v)
 
-function get_subsignal(signal::Signal, ind::Int64)
-    if isa(signal.signal_t, Array) || haskey(signal.signal_t, ind)
-        return signal.signal_t[ind]
+function Base.getindex(s::LazySignal, i::Int)
+    if haskey(s.signal_t, i)
+        return s.signal_t[i]
     else
-        m = dec_to_bin(ind-1, signal.n)
-        sgns = (-1) .^ [m ⋅ dec_to_bin(l, signal.n) for l in signal.locs]
-        # val = (1 / sqrt(2 ^ signal.n)) * (signal.strengths ⋅ sgns) + rand(Normal(0.0, signal.noise_sd))
-        val = signal.strengths ⋅ sgns + rand(Normal(0.0, signal.noise_sd))
-        signal.signal_t[ind] = val
-        return val
+        m = dec_to_bin(i-1, s.n)
+        sgns = (-1) .^ [m ⋅ dec_to_bin(l, s.n) for l in s.locs]
+        v = s.strengths ⋅ sgns + rand(Normal(0.0, s.noise_sd))
+        s.signal_t[i] = v
+        return v
     end
 end
 
-function get_subsignal(signal::Signal, inds::Array{Int64,1})
-    return map(x -> get_subsignal(signal, x), inds)
+function Base.getindex(s::Signal, r::AbstractUnitRange)
+    return map(i -> s[i], r)
+end
+
+function Base.getindex(s::Signal, a::Array{<: Int})
+    return map(i -> s[i], a)
+end
+
+function Base.getindex(s::Signal, a::Array{Array{<: Int}})
+    println("hi")
+    return map(i -> s[i], a)
+end
+
+function Base.setindex!(s::LazySignal, v, i::Int)
+    @warn("LazySignal is set based on transformed modes: explicitly setting a value is not supported.")
+end
+
+function Base.show(io::IO, s::LazySignal)
+    println("Lazy signal with locations at ", s.locs)
 end
 
 struct InputSignal <: Signal
@@ -79,11 +94,11 @@ struct InputSignal <: Signal
 end
 
 Base.size(s::InputSignal) = size(s.signal_t)
-Base.getindex(s::InputSignal, i::Int64) = s.signal_t[i]
-Base.setindex!(s::InputSignal, v, i::Int64) = (s.signal_t[i] = v)
+Base.getindex(s::InputSignal, i::Int) = s.signal_t[i]
+Base.setindex!(s::InputSignal, v, i::Int) = (s.signal_t[i] = v)
 
-function get_random_sparse_signal(n::Int64, K::Int64, σ::Float64, minpower::Float64, maxpower::Float64; lazy::Bool=true)
-    locs = sample(0:2^n-1, K, replace=false)
+function get_random_sparse_signal(n::Int, K::Int, σ::Float64, minpower::Float64, maxpower::Float64; lazy::Bool=true)
+    locs = sample(0:(2^n-1), K, replace=false)
     strengths = Float64.(rand(Uniform(minpower, maxpower), K)) .* (-1) .^ rand(Bool, K)
     if lazy
         return LazySignal(n, locs, strengths, σ)
@@ -92,7 +107,7 @@ function get_random_sparse_signal(n::Int64, K::Int64, σ::Float64, minpower::Flo
     end
 end
 
-function get_random_delta_sparse_signal(n::Int64, σ::Float64, delta::Float64, c::Int64, minpower::Float64, maxpower::Float64)
+function get_random_delta_sparse_signal(n::Int, σ::Float64, delta::Float64, c::Int, minpower::Float64, maxpower::Float64)
     k = c * n ^ delta |> ceil |> Int64
     return get_random_sparse_signal(n, k, σ, minpower, maxpower)
 end
