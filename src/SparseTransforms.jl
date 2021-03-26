@@ -22,8 +22,8 @@ module SparseTransforms
         "code" => [:none]
     )
 
-    function spright(signal::Signal, methods::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
-        return transform(signal, methods, fwht; verbose=verbose, report=report)
+    function spright(signal::Signal, methods_list::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
+        return transform(signal, methods_list, fwht; verbose=verbose, report=report)
     end
 
     """
@@ -35,7 +35,7 @@ module SparseTransforms
     signal : TestSignal object.
     The signal to be transformed / compared to.
 
-    methods : Array{Symbol,1}
+    methods_list : Array{Symbol,1}
     The three symbols [query_method, delays_method, reconstruct_method].
     All implemented methods are available in `all_methods`: if you add a new method, make sure to update `all_methods`.
 
@@ -72,28 +72,28 @@ module SparseTransforms
     wht : Array{Float64,1}
     The WHT constructed by subsampling and peeling.
     """
-    function transform(signal::Signal, methods::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
-        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods)
+    function transform(signal::Signal, methods_list::Array{Symbol,1}, transform::Function; verbose::Bool=false, report::Bool=false)
+        for (method_type, method_name) in zip(["query", "delays", "reconstruct", "code"], methods_list)
             impl_methods = all_methods[method_type]
             @assert method_name in impl_methods "$method_type method must be one of $impl_methods"
         end
-        query_method, delays_method, reconstruct_method, code = methods
+        query_method, delays_method, reconstruct_method, code = methods_list
         @assert (reconstruct_method != :so) || (code != :none)
         # check the condition for p_failure > eps
         # upper bound on the number of peeling rounds, error out after that point
 
         num_peeling = 0
-        locs = []
-        strengths = []
-        wht = Dict()
+        locs = BitArray[]
+        strengths = Float64[]
+        wht = Dict{Int64,Float64}()
         b = get_b(signal; method=query_method)
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
         N, B = 2^signal.n, 2^b
 
-        Us = []
+        Us = Array{Float64}[]
         if report
-            used = Set()
+            used = Set{Int}()
         end
 
         if delays_method == :nso
@@ -123,10 +123,10 @@ module SparseTransforms
 
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
-        # K is the binary representation of all integers from 0 to 2 ** n - 1.
-        select_froms = []
+        # K is the binary representation of all integers from 0 to 2 ^ n - 1.
+        select_froms = Array{Int64}[] 
         for M in Ms
-            selects = 0
+            selects = [0]
             if reconstruct_method == :mle
                 selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
             end
@@ -154,8 +154,8 @@ module SparseTransforms
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
 
             # first step: find all the singletons and multitons.
-            singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
-            multitons = [] # list of (i, j) values indicating where multitons are.
+            singletons = Dict{Tuple{Int64,Int64},Tuple{BitArray,Float64}}() # dictionary from (i, j) values to the true index of the singleton, k.
+            multitons = Tuple{Int64,Int64}[] # list of (i, j) values indicating where multitons are.
 
             for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
                 col_gen = U |> eachrow |> enumerate
@@ -177,7 +177,7 @@ module SparseTransforms
                         ) # find the best fit singleton
                         residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
-                            push!(multitons, [i, j])
+                            push!(multitons, (i, j))
                         else # declare as singleton
                             singletons[(i, j)] = (k, ρ)
                         end # if residual norm > cutoff
@@ -203,8 +203,8 @@ module SparseTransforms
             end
 
             # balls to peel
-            balls_to_peel = Set()
-            ball_values = Dict()
+            balls_to_peel = Set{Int64}()
+            ball_values = Dict{Int64,Float64}()
             for (_, (k, ρ)) in singletons
                 ball = bin_to_dec(k)
                 push!(balls_to_peel, ball)
@@ -220,7 +220,7 @@ module SparseTransforms
             for ball in balls_to_peel
                 num_peeling += 1
                 k = dec_to_bin(ball, signal.n)
-
+                
                 push!(locs, k)
                 push!(strengths, ball_values[ball])
 
@@ -238,16 +238,16 @@ module SparseTransforms
             end # for ball
         end # while
 
-        loc = Set()
+        loc = Set{Int64}()
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
             if !haskey(wht, idx)
-                wht[idx] = value
+                wht[idx] = value / (2 ^ b)
             end
         end
 
-        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
+        wht = filter(f -> abs(last(f)) ≥ signal.noise_sd, wht)
         if report
             return wht, length(used)
         else

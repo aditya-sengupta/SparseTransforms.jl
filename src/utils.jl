@@ -13,11 +13,7 @@ function fwht(x::Array{Float64,1}; recurses=false)
         X_even = fwht(x[1 : N÷2]; recurses=true)
         X_odd = fwht(x[N÷2+1 : N]; recurses=true)
         res = cat(X_even + X_odd, X_even - X_odd, dims=1)
-        if !recurses
-            return res #/ √N
-        else
-            return res
-        end
+        return res
     end
 end
 
@@ -41,7 +37,7 @@ Returns a matrix where row 'i' is dec_to_bin(i, m),
 for i from 0 to 2 ** m - 1.
 """
 function binary_ints(m::Int64)
-    return @pipe 0:2^m-1 |> dec_to_bin.(_, m) |> hcat(_...)
+    return @pipe dec_to_bin.(0:2^m-1, m) |> hcat(_...)
 end
 
 """
@@ -53,5 +49,5 @@ function sign_spright(x)
 end
 
 function expected_bin(k::BitArray{1}, M::BitArray{2})
-    return @pipe M'k |> _ .% 2 |> Bool.(_) |> bin_to_dec(_) + 1
+    return @pipe M'k .% 2 |> Bool.(_) |> bin_to_dec(_) + 1
 end

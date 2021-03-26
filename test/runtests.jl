@@ -14,3 +14,5 @@ function tests()
     test_spright()
     test_random()
 end
+
+tests()

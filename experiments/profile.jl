@@ -1,17 +1,22 @@
+"""
+Methods to profile the SPRIGHT algorithm and this implementation of it.
+"""
+
 using SparseTransforms
 using ProgressMeter
 using Plots
+using Profile
 
-nrange = 4:16
-num_runs = 40
-def_methods = [:simple, :nso, :nso, :none]
-σ = 1.0
+nrange = 4:20
+num_runs = 5
+methods_list = [:simple, :nso, :nso, :none]
+σ = 1e-2
 deltas = 0.05:0.05:0.3 |> collect
 
-function method_name(methods::Array{Symbol,1})
-    if methods[3] == :nso
+function method_name(methods_list::Array{Symbol,1})
+    if methods_list[3] == :nso
         return "non-sample-optimal"
-    elseif methods[3] == :mle
+    elseif methods_list[3] == :mle
         return "maximum likelihood"
     end
 end
@@ -28,7 +33,7 @@ function bvals(n::Int64, btype::Symbol)
     end
 end
 
-function profile_fixed_b(methods::Array{Symbol,1}, btype::Symbol)
+function profile_fixed_b(methods_list::Array{Symbol,1}, btype::Symbol)
     brange = map(x -> bvals(x, btype), nrange)
     times = Float64[]
     samples = Float64[]
@@ -40,7 +45,7 @@ function profile_fixed_b(methods::Array{Symbol,1}, btype::Symbol)
             # strengths = Float64.(rand(Uniform(0.1, 10), 2^b)) .* (-1) .^ rand(Bool, 2^b)
             # signal = LazySignal(n, locs, strengths, σ)
             signal = get_random_sparse_signal(n, 2^b, σ, 0.1, 10)
-            res = @timed spright(signal, methods; report=true)
+            res = @timed spright(signal, methods_list; report=true)
             s += res.value[2]
             t += res.time
         end
@@ -62,7 +67,7 @@ function check_transform_correctness(target, estimated, σ)
     return true
 end
 
-function profile_delta_sparse(methods::Array{Symbol,1}, deltas::Array{Float64,1})
+function profile_delta_sparse(methods_list::Array{Symbol,1}, deltas::Array{Float64,1})
     times_arr = Any[]
     samples_arr = Any[]
     correct_arr = Any[]
@@ -74,7 +79,7 @@ function profile_delta_sparse(methods::Array{Symbol,1}, deltas::Array{Float64,1}
             s, t, c = 0, 0, 0
             for i = 1:num_runs
                 signal = get_random_delta_sparse_signal(n, σ, δ, 1, 0.5, 10.0)
-                res = @timed spright(signal, methods; report=true)
+                res = @timed spright(signal, methods_list; report=true)
                 s += res.value[2]
                 t += res.time
                 c += check_transform_correctness(signal, res.value[1], σ)
@@ -90,16 +95,16 @@ function profile_delta_sparse(methods::Array{Symbol,1}, deltas::Array{Float64,1}
     return samples_arr, times_arr, correct_arr
 end
 
-function plot_samples(methods::Array{Symbol,1}, btype::Symbol)
+function plot_samples(methods_list::Array{Symbol,1}, btype::Symbol)
     brange = map(x -> bvals(x, btype), nrange)
-    samples, times = profile(methods, btype)
+    samples, times = profile(methods_list, btype)
     plot()
     plot!(nrange, (2 .^ brange) .* nrange ./ (2 .^ nrange); label="asymptotic trend")
-    plot!(nrange, samples; label="experimental values", xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with $(method_name(methods)) decoding and $(string(btype)) sparsity")
+    plot!(nrange, samples; label="experimental values", xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with $(method_name(methods_list)) decoding and $(string(btype)) sparsity")
 end
 
 function plot_delta_profile()
-    samples, times = profile_delta_sparse(def_methods, deltas)
+    samples, times = profile_delta_sparse(methods_list, deltas)
     plot()
     plot!(nrange, samples; label=hcat(deltas...), xlabel="log2(signal length)", ylabel="sample fraction", title="Sample ratio with sparsity O(N^delta)")
     brange = map(x -> 2^(-0.7x) * x^2 / 12.5, nrange)
@@ -107,7 +112,7 @@ function plot_delta_profile()
 end
 
 function plot_delta_times()
-    samples, times = profile_delta_sparse(def_methods, deltas)
+    samples, times = profile_delta_sparse(methods_list, deltas)
     plot()
     plot!(nrange, times; label=hcat(deltas...), xlabel="log2(signal length)", ylabel="runtime", title="Runtime with sparsity O(N^delta)")
     brange = map(x -> 2^(0.3x) * x^3, nrange)
