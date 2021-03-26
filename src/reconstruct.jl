@@ -130,7 +130,7 @@ function bin_cardinality(signal::Signal, M, D; method=:mle, verbose=false)
     b = size(M, 2)
     U, inds = compute_delayed_wht(signal, M, D)
     cardinality = ones(Int64, signal.n) # vector of indicators
-    singleton_indices = []
+    singleton_indices = Int64[]
     cutoff = 2 * signal.noise_sd^2 * (2^(signal.n - b)) * size(D, 1)
     if signal.noise_sd > 0
         K = binary_ints(signal.n)

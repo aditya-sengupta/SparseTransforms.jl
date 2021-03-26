@@ -69,7 +69,6 @@ function Base.getindex(s::Signal, a::Array{<: Int})
 end
 
 function Base.getindex(s::Signal, a::Array{Array{<: Int}})
-    println("hi")
     return map(i -> s[i], a)
 end
 

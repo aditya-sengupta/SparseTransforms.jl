@@ -14,7 +14,7 @@ function test_reconstruct()
     Ms = get_Ms(signal.n, b; method=query_method)
     K = binary_ints(signal.n)
 
-    select_froms = []
+    select_froms = Array{Int64}[]
     for M in Ms
         selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
         push!(select_froms, selects)
@@ -30,13 +30,13 @@ function test_reconstruct()
             delays_method = :identity_like
         end
         D = get_D(signal.n; method=delays_method, num_delays=2*n)
-        Us = Any[]
+        Us = Array{Float64}[]
         for M in Ms
             U, used_i = compute_delayed_subtransform(signal, M, D, fwht)
             push!(Us, U)
         end
         S = (-1) .^ (D * K)
-        singleton_guesses = []
+        singleton_guesses = Int64[]
         for (i, (U, select_from)) in enumerate(zip(Us, select_froms))
             col_gen = U |> eachrow |> enumerate
             for (j, col) in col_gen

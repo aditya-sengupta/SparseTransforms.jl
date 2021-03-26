@@ -83,17 +83,17 @@ module SparseTransforms
         # upper bound on the number of peeling rounds, error out after that point
 
         num_peeling = 0
-        locs = []
-        strengths = []
-        wht = Dict()
+        locs = BitArray[]
+        strengths = Float64[]
+        wht = Dict{Int64,Float64}()
         b = get_b(signal; method=query_method)
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
         N, B = 2^signal.n, 2^b
 
-        Us = []
+        Us = Array{Float64}[]
         if report
-            used = Set()
+            used = Set{Int}()
         end
 
         if delays_method == :nso
@@ -124,7 +124,7 @@ module SparseTransforms
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ** n - 1.
-        select_froms = []
+        select_froms = Int64[]
         for M in Ms
             selects = 0
             if reconstruct_method == :mle
@@ -155,7 +155,7 @@ module SparseTransforms
 
             # first step: find all the singletons and multitons.
             singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
-            multitons = [] # list of (i, j) values indicating where multitons are.
+            multitons = Tuple{Int64,Int64}[] # list of (i, j) values indicating where multitons are.
 
             for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
                 col_gen = U |> eachrow |> enumerate
@@ -177,7 +177,7 @@ module SparseTransforms
                         ) # find the best fit singleton
                         residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
-                            push!(multitons, [i, j])
+                            push!(multitons, (i, j))
                         else # declare as singleton
                             singletons[(i, j)] = (k, ρ)
                         end # if residual norm > cutoff
@@ -203,8 +203,8 @@ module SparseTransforms
             end
 
             # balls to peel
-            balls_to_peel = Set()
-            ball_values = Dict()
+            balls_to_peel = Set{Int64}()
+            ball_values = Dict{Int64,Float64}()
             for (_, (k, ρ)) in singletons
                 ball = bin_to_dec(k)
                 push!(balls_to_peel, ball)
@@ -220,7 +220,7 @@ module SparseTransforms
             for ball in balls_to_peel
                 num_peeling += 1
                 k = dec_to_bin(ball, signal.n)
-
+                
                 push!(locs, k)
                 push!(strengths, ball_values[ball])
 

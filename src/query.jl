@@ -69,7 +69,7 @@ function get_Ms_simple(n::Int64, b::Int64)
     # @assert n % b == 0 "n must be exactly divisible by b"
     num_to_get = Int64(ceil(n / b))
 
-    Ms = Any[]
+    Ms = BitArray[]
     push!(Ms, get_partial_I(n, b, n-b))
     for i in num_to_get-2:-1:0
         push!(Ms, get_partial_I(n, b, b*i))
@@ -79,7 +79,7 @@ end
 
 function get_Ms_random(n::Int64, b::Int64)
     num_to_get = n ÷ b
-    Ms = Any[]
+    Ms = BitArray[]
 
     for i in 1:num_to_get
         push!(Ms, bitrand(n, b))
