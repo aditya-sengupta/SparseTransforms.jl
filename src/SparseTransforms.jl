@@ -123,10 +123,10 @@ module SparseTransforms
 
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
-        # K is the binary representation of all integers from 0 to 2 ** n - 1.
-        select_froms = Int64[]
+        # K is the binary representation of all integers from 0 to 2 ^ n - 1.
+        select_froms = Array{Int64}[] 
         for M in Ms
-            selects = 0
+            selects = [0]
             if reconstruct_method == :mle
                 selects = @pipe M' * K |> transpose |> Bool.(_) |> eachrow |> bin_to_dec.(_)
             end
@@ -154,7 +154,7 @@ module SparseTransforms
         while multitons_found && (num_peeling < peeling_max) && (iters < max_iters)
 
             # first step: find all the singletons and multitons.
-            singletons = Dict() # dictionary from (i, j) values to the true index of the singleton, k.
+            singletons = Dict{Tuple{Int64,Int64},Tuple{BitArray,Float64}}() # dictionary from (i, j) values to the true index of the singleton, k.
             multitons = Tuple{Int64,Int64}[] # list of (i, j) values indicating where multitons are.
 
             for (i, (M, U, select_from)) in enumerate(zip(Ms, Us, select_froms))
