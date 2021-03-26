@@ -43,7 +43,6 @@ function test_random()
     println("Used $(used_size / 2^n) of all time samples")
     @test length(signal.locs) == length(spright_wht)
     for (l, s) in zip(signal.locs, signal.strengths)
-        # println(spright_wht[l] / s)
         @test isapprox(spright_wht[l], s, atol=5*σ)
     end
 end

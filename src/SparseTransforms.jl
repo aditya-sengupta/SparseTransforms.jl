@@ -238,16 +238,15 @@ module SparseTransforms
             end # for ball
         end # while
 
-        loc = Set()
+        loc = Set{Int64}()
         for (k, value) in zip(locs, strengths) # iterating over (i, j)s
             idx = bin_to_dec(k) # converting 'k's of singletons to decimals
             push!(loc, idx)
             if !haskey(wht, idx)
-                wht[idx] = value
+                wht[idx] = value / (2 ^ b)
             end
         end
 
-        wht = Dict(i => x / (2 ^ b) for (i,x) in wht)
         wht = filter(f -> abs(last(f)) ≥ signal.noise_sd, wht)
         if report
             return wht, length(used)
