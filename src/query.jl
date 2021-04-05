@@ -18,7 +18,16 @@ A semi-arbitrary fixed choice of the sparsity coefficient.
 See get_b for full signature.
 """
 function get_b_simple(signal::Signal)
-    return signal.n ÷ 3
+    # I don't know why, but changing this to signal.n \div 3 makes it break
+    if signal.n == 4
+        return 2
+    elseif (signal.n == 8) || (signal.n == 16)
+        return 4
+    elseif (signal.n < 16)
+        return signal.n ÷ 2
+    else
+        return signal.n ÷ 4
+    end
 end
 
 get_b_lookup = Dict(
