@@ -2,7 +2,7 @@ language: julia
 julia:
 - 1.5.0
 
-codecov: false
+codecov: true
 
 after_success:
 - julia -e 'using Pkg; cd(Pkg.dir("MyPkg")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
