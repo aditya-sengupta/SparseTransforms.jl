@@ -8,7 +8,7 @@ function test_random()
     n = 8
     k = 2
     σ = 1e-5
-    minpower, maxpower = 0.5, 10.0
+    minpower, maxpower = 0.5, 5.0
     signal = get_random_sparse_signal(n, 2^k, σ, minpower, maxpower)
 
     println("True locations: ", signal.locs)
