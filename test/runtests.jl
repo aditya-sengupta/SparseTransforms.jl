@@ -5,6 +5,7 @@ include("test_query.jl")
 include("test_reconstruct.jl")
 include("test_spright.jl")
 include("test_random.jl")
+include("test_codes.jl")
 
 function tests()
     println("Testing SPRIGHT")
@@ -13,6 +14,7 @@ function tests()
     test_reconstruct()
     test_spright()
     test_random()
+    test_codes()
 end
 
 tests()
