@@ -199,36 +199,68 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
     k = N - size(H)[1]
     M = N - k
 
-    L = zeros(N) # LLR for the variable nodes
-    lambda = zeros(M) # LLR for the check nodes
+    variableLLR = zeros(N) # LLR for the variable nodes
+    checkLLR = zeros(M) # LLR for the check nodes
     messagesToCheckNodes = zeros(N, M) # Messages passed from variable nodes to check nodes. Omega matrix
     messagesToVarNodes = zeros(M, N) # Messages passed from check nodes to variable nodes. Lambda matrix
 
     # 1. Initialize the variable nodes based on received information (the identity part of the codeword)
     # We initialize each variable node's LLR
+    # L_i = ln(P(bit = 1|observed)/P(bit = 0|observed)) - positive (>= 0) for 1, negative for 0
     # Assuming uniform prior, L_i = ln(p/(1-p)) when y_i = 0 and ln((1-p)/p) when y_i = 1
     lnq = log(p) - log(1-p)
     for i in 1:N
-        L[i] = lnq * ((-1) ^ y[i])
+        variableLLR[i] = y[i] ? -lnq : lnq
     end
-    println(L)
+    
+    # Initial messages are just the starting beliefs
+    for i in 1:N
+        for j in 1:M
+            if H[j, i]
+                messagesToCheckNodes[i, j] = variableLLR[i]
+            end
+        end
+    end
+
+    # print("My initial beliefs are ")
+    # display(variableLLR)
+    # println()
+
+    # print("My initial messages are ")
+    # display(messagesToCheckNodes)
+    # println()
 
     # 30 rounds of decoding based on literature and practice
     for iter in 1:iters
-        # 2. Update the check nodes and generate new check to variable messages
+        # 2. Update the check node LLRs and generate new check to variable messages
         for i in 1:M
-            lambda[i] = 0
+            checkLLR[i] = 0
+            sign = 0 # even is negative, odd is true as per usual
             for j in 1:N
                 if H[i, j]
-                    lambda[i] += log(tanh(abs(messagesToCheckNodes[j, i]) / 2))
+                    # save the parity of the variable nodes' signs
+                    sign += (messagesToCheckNodes[j, i] >= 0) ? 1 : 0
+                    # tanh clamps to [0, 1], so each contribution is negative, and the reliability is the opposite of this
+                    checkLLR[i] += log(tanh(abs(messagesToCheckNodes[j, i]) / 2))
                 end
+            end
+            if mod(sign, 2) == 1 # make sure parity lines up
+                checkLLR[i] *= -1
             end
         end
 
-        println(lambda)
+        # print("My check node LLRs are ")
+        # display(checkLLR)
+        # println()
+
         for i in 1:M
             for j in 1:N
-                Lambda[i, j] = 2 * atanh(exp(log(lambda[i]) - log(tanh(Omega[j, i] / 2))))
+                if H[i, j]
+                    messagesToVarNodes[i, j] = 2 * atanh(exp(-abs(checkLLR[i]) - log(tanh(abs(messagesToCheckNodes[j, i] / 2)))))
+                    if !xor(checkLLR[i] >= 0, messagesToCheckNodes[j, i] >= 0)
+                        messagesToVarNodes[i, j] *= -1
+                    end
+                end
             end
         end
 
@@ -236,27 +268,27 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
         for i in 1:N
             for j in 1:M
                 if H[j, i]
-                    L[i] += Lambda[j, i]
+                    variableLLR[i] += messagesToVarNodes[j, i]
                 end
             end
         end
 
         for i in 1:N
             for j in 1:M
-                Omega[i, j] = L[i] - Lambda[j, i]
+                messagesToCheckNodes[i, j] = variableLLR[i] - messagesToVarNodes[j, i]
             end
         end
         
         # 4. Quantize and halt
         estimate = falses(N)
         for i in 1:N
-            if L[i] >= 0
+            if variableLLR[i] >= 0
                 estimate[i] = true
             end
         end
 
-        if BitVector((transpose(estimate) * transpose(H)) .% 2) == falses(M)
-            return estimate
+        if BitVector(vec((transpose(estimate) * transpose(H)) .% 2)) == falses(M)
+            return estimate[1:k]
         end
     end
 
@@ -264,9 +296,21 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
     return nothing
 end
 
-# H, G = generate_LDPC_code(15, 25)
-# input = BitVector([1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0])
-# codeword = encode_LDPC(input, G)
-# recovered = decode_LDPC(codeword, H, 0.1)
-# println(input)
-# println(recovered)
+using Distributions
+
+k = 100
+N = 200
+H, G = generate_LDPC_code(k, N)
+# display(H)
+input = BitVector(rand(Binomial(1, 0.5), k))
+codeword = encode_LDPC(input, G)
+p = 0.05
+d = Binomial(1, p)
+noise = BitVector(rand(d, N))
+for i in 1:size(codeword)[1]
+    codeword[i] = xor(codeword[i], noise[i])
+end
+recovered = decode_LDPC(codeword, H, p, 200)
+println(input)
+println(noise)
+println(recovered)
