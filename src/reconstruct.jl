@@ -67,12 +67,13 @@ function singleton_detection_so(U_slice; kwargs...)
     n = kwargs[:n]
     p1, p2, p3 = kwargs[:num_delays]
     @assert length(U_slice) == p1+p2+p3
-    D = kwargs[:D]
+    H = kwargs[:H]
+    P_e = kwargs[:P_e]
     code = kwargs[:code]
 
     sgn = estimate_sign(U_slice[p1+1 : p1+p2])
     recvd_codeword = sgn ⊻ sign_spright.(U_slice[p1+p2+1 : p1+p2+p3])
-    k = decode_with(recvd_codeword, D, code)
+    k = decode_with(recvd_codeword, H, P_e, code)
     s_k = (-1) .^ (D * k) # TODO: maybe only use last offsets?
     return k, sgn, s_k
 end

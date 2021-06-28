@@ -10,6 +10,7 @@ Methods for the query generator: specifically, to
 # see how Amirali did it
 
 include("input_signal.jl")
+include("codes.jl")
 using StatsBase
 using Random
 
@@ -101,7 +102,7 @@ end
 Gets the delays matrix [0; I], of dimension (n+1, n). See get_D for full signature.
 """
 function get_D_identity_like(n::Int64; kwargs...)
-    return BitArray(vcat(zeros(1, n), Matrix{Bool}(I, n, n)))
+    return BitArray(vcat(zeros(1, n), Matrix{Bool}(I, n, n))), 0
 end
 
 """
@@ -110,7 +111,8 @@ Gets a random delays matrix of dimension (num_delays, n). See get_D for full sig
 function get_D_random(n::Int64; kwargs...)
     num_delays = kwargs[:num_delays]
     choices = sample(0:2^n-1, num_delays, replace=false)
-    return @pipe dec_to_bin.(choices, n) |> hcat(_...) |> transpose |> BitArray
+    D = @pipe dec_to_bin.(choices, n) |> hcat(_...) |> transpose |> BitArray
+    return D, 0
 end
 
 """
@@ -127,11 +129,15 @@ function get_D_nso(n::Int64; kwargs...)::BitArray{2}
         modulated_offsets = @pipe [(row .⊻ r) for r in eachrow(identity_like)] |> hcat(_...) |> transpose
         D = vcat(D, modulated_offsets)
     end
-    return D
+    return D, 0
 end
 
-function get_generator_matrix(codelen::Int64, n::Int64, code::Symbol)
-    return zeros((codelen, n))
+get_mat_lookup = Dict(
+    :ldpc => generate_LDPC_code
+)
+
+function get_code_matrices(codelen::Int64, n::Int64, code::Symbol)
+    return get_mat_lookup[code](n, codelen)
 end
 
 """
@@ -141,10 +147,11 @@ Returns a matrix of dimension (p1+p2+p3, n).
 function get_D_so(n::Int64; kwargs...)::BitArray{2}
     p1, p2, p3 = kwargs[:num_delays]
     code = kwargs[:code]
+    noise_sd = kwargs[:noise_sd]
     D1 = get_D_random(n, num_delays=p1)
     D2 = zeros((p2, n))
-    D3 = get_generator_matrix(p3, n, code)
-    return vcat(D1, D2, D3)
+    H, G = get_code_matrices(p3, n, code)
+    return vcat(D1, D2, G), H
 end
 
 get_D_lookup = Dict(

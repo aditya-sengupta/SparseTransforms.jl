@@ -19,7 +19,7 @@ module SparseTransforms
         "query" => [:simple, :random],
         "delays" => [:identity_like, :random, :nso],
         "reconstruct" => [:noiseless, :mle, :nso],
-        "code" => [:none]
+        "code" => [:none, :ldpc]
     )
 
     function spright(signal::Signal, methods_list::Array{Symbol,1}; verbose::Bool=false, report::Bool=false)
@@ -57,6 +57,7 @@ module SparseTransforms
             :noiseless : decode according to [2], section 4.2, with the assumption the signal is noiseless.
             :mle : naive noisy decoding; decode by taking the maximum-likelihood singleton that could be at that bin.
             :nso : reconstruct according to the NSO-SPRIGHT algorithm.
+            :so  : reconstruct according to some optimal erasure code. LDPC is currently implemented.
 
     transform : Function
     The base transform: either `fwht` or `fft`.
@@ -90,6 +91,7 @@ module SparseTransforms
         Ms = get_Ms(signal.n, b; method=query_method)
         peeling_max = 2^b
         N, B = 2^signal.n, 2^b
+        P_e = exp(-B / (σ^2 ⋅ N))
 
         Us = Array{Float64}[]
         if report
@@ -100,13 +102,13 @@ module SparseTransforms
             num_delays = signal.n * Int64(ceil(log2(signal.n))) # idk
         elseif delays_method == :so
             linearrithmic = signal.n * Int64(ceil(log2(signal.n)))
-            num_delays = [linearrithmic,    # P1
+            num_delays = [linearrithmic,    # P1 TODO: pick big constant
                           signal.n,         # P2
                           linearrithmic]    # P3
         else
             num_delays = signal.n + 1
         end
-        D = get_D(signal.n; method=delays_method, num_delays=num_delays, code=code)
+        D, H = get_D(signal.n; method=delays_method, num_delays=num_delays, code=coded)
         if reconstruct_method == :mle
             K = binary_ints(signal.n)
             S = (-1) .^(D * K)
@@ -124,7 +126,7 @@ module SparseTransforms
         cutoff = 4 * signal.noise_sd ^ 2 * (2 ^ (signal.n - b)) * sum(num_delays) # noise threshold
 
         # K is the binary representation of all integers from 0 to 2 ^ n - 1.
-        select_froms = Array{Int64}[] 
+        select_froms = Array{Int64}[]
         for M in Ms
             selects = [0]
             if reconstruct_method == :mle
@@ -173,7 +175,9 @@ module SparseTransforms
                             S_slice=slice,
                             n=signal.n,
                             num_delays=num_delays,
-                            D=D
+                            D=D,
+                            H=H,
+                            P_e=P_e
                         ) # find the best fit singleton
                         residual = col - ρ * s_k
                         if (expected_bin(k, M) != j) || (residual ⋅ residual > cutoff)
@@ -220,7 +224,7 @@ module SparseTransforms
             for ball in balls_to_peel
                 num_peeling += 1
                 k = dec_to_bin(ball, signal.n)
-                
+
                 push!(locs, k)
                 push!(strengths, ball_values[ball])
 

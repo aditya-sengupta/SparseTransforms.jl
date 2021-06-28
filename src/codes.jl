@@ -7,31 +7,6 @@ Linear channel coding methods for frequency detection; specifically to
 2. BSC decode the results
 """
 
-get_code_lookup = Dict()
-
-"""
-Estimate the frequency from a singleton given an offset coding scheme and generator matrix G.
-
-Arguments
----------
-recvd_codeword : BitArray{1}
-The sampled vector from which we are decoding
-
-G : BitArray{2}
-The generator matrix fo the code
-
-code : Symbol
-The code to use. All methods referenced must use this signature (minus "code".)
-
-Returns
--------
-k : BitArray{1}
-The estimated frequency.
-"""
-function decode_with(recvd_codeword::BitArray{1}, G::BitArray{2}, code::Symbol)::BitArray{1}
-    return get_code_lookup[code](recvd_codeword, G)
-end
-
 #LDPC Code Based on https://github.com/christianpeel/LDPCsim.jl/blob/master/src/LDPCsim.jl
 
 function generate_LDPC_adjacency_matrix(M::Int64, N::Int64)
@@ -96,7 +71,7 @@ function generate_LDPC_generator_matrix(H::BitArray)
     N = size(H)[2]
     pivot_row = 1
     pivot_col = N - M + 1
-    
+
 
     for _ in 1:M
         # println("In pivot positon (", pivot_row, ", ", pivot_col, ")")
@@ -117,7 +92,7 @@ function generate_LDPC_generator_matrix(H::BitArray)
                 return nothing #Rank failure if we reach here
             end
         end
-        
+
         # 2. Kill the 1s below this in this column
         for j in (pivot_row + 1):M
             if H[j, pivot_col]
@@ -212,7 +187,7 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
     for i in 1:N
         variableLLR[i] = y[i] ? -lnq : lnq
     end
-    
+
     # Initial messages are just the starting beliefs
     for i in 1:N
         for j in 1:M
@@ -278,7 +253,7 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
                 messagesToCheckNodes[i, j] = variableLLR[i] - messagesToVarNodes[j, i]
             end
         end
-        
+
         # 4. Quantize and halt
         estimate = falses(N)
         for i in 1:N
@@ -296,21 +271,48 @@ function decode_LDPC(y::BitVector, H::BitArray, p::Float64, iters::Int64=30)
     return nothing
 end
 
-using Distributions
+get_code_lookup = Dict(
+    :ldpc => decode_LDPC
+)
 
-k = 100
-N = 200
-H, G = generate_LDPC_code(k, N)
-# display(H)
-input = BitVector(rand(Binomial(1, 0.5), k))
-codeword = encode_LDPC(input, G)
-p = 0.05
-d = Binomial(1, p)
-noise = BitVector(rand(d, N))
-for i in 1:size(codeword)[1]
-    codeword[i] = xor(codeword[i], noise[i])
+"""
+Estimate the frequency from a singleton given an offset coding scheme and generator matrix G.
+
+Arguments
+---------
+recvd_codeword : BitArray{1}
+The sampled vector from which we are decoding
+
+G : BitArray{2}
+The generator matrix fo the code
+
+code : Symbol
+The code to use. All methods referenced must use this signature (minus "code".)
+
+Returns
+-------
+k : BitArray{1}
+The estimated frequency.
+"""
+function decode_with(recvd_codeword::BitArray{1}, H::BitArray{2}, P_e::Float64, code::Symbol)::BitArray{1}
+    return get_code_lookup[code](recvd_codeword, H, P_e)
 end
-recovered = decode_LDPC(codeword, H, p, 200)
-println(input)
-println(noise)
-println(recovered)
+
+# using Distributions
+#
+# k = 100
+# N = 200
+# H, G = generate_LDPC_code(k, N)
+# # display(H)
+# input = BitVector(rand(Binomial(1, 0.5), k))
+# codeword = encode_LDPC(input, G)
+# p = 0.05
+# d = Binomial(1, p)
+# noise = BitVector(rand(d, N))
+# for i in 1:size(codeword)[1]
+#     codeword[i] = xor(codeword[i], noise[i])
+# end
+# recovered = decode_LDPC(codeword, H, p, 200)
+# println(input)
+# println(noise)
+# println(recovered)
